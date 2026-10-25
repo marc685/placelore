@@ -8,6 +8,7 @@ Build **Placelore**, a mobile-first web app (installable as a PWA) that tells th
 
 ## Who it's for and the core flow
 A traveller standing in a town or out on a farm road. They either:
+
 1. Tap **"Where am I?"**: use the phone's GPS (`navigator.geolocation`, high accuracy), reverse-geocode to the nearest town, then load that place, or
 2. Type a **town name** into a search box. If there are several matches, show a pick list (name plus full address).
 
