@@ -39,6 +39,7 @@ Keep the last 8 places in "Recently visited" on the start screen (localStorage).
 - Every list item elsewhere has a **"Show on map"** button that scrolls to the map, zooms in and opens the popup.
 
 Data comes from the **Overpass API** (POST; fall back to the next mirror if one fails: overpass-api.de, overpass.kumi.systems, overpass.private.coffee). Use two queries in parallel:
+
 - *Lines* (`out tags geom(<bbox>)`): `relation[route~hiking|foot|walking]`, `way[highway~path|bridleway]` (radius capped at 12 km), named `way[highway~footway|track|steps]`, named `way[waterway~river|stream|canal]`.
 - *Points* (`out tags center`): tourism camp_site/caravan_site/picnic_site/viewpoint/wine_cellar/alpine_hut/wilderness_hut; leisure picnic_site and named nature_reserve; named protected_area; place=farm; named landuse=farmyard; shop=farm; craft winery/brewery/distillery/beekeeper; named natural peak/volcano/hill; named historic=*; named waterway=river relations. Then `out count` for landuse vineyard / orchard / farmland / meadow / greenhouse & nursery / forest.
 
