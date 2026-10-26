@@ -1,11 +1,12 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" translate="no">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#24553f">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <title>Placelore</title>
+<meta name="google" content="notranslate">
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="apple-touch-icon" href="/icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -343,12 +344,12 @@ footer{padding-block:24px 40px;color:var(--muted);font-size:.85rem}
       <h2>Overview</h2>
       <div class="overview">
         <div style="min-width:0">
-          <div id="ov-intro"><p class="loading">Finding the encyclopaedia entry…</p></div>
-          <div id="ov-name"></div>
+          <div id="ov-intro" data-xl><p class="loading">Finding the encyclopaedia entry…</p></div>
+          <div id="ov-name" data-xl></div>
           <h3>Interesting facts</h3>
-          <div id="ov-facts"><p class="loading">Gathering facts…</p></div>
+          <div id="ov-facts" data-xl><p class="loading">Gathering facts…</p></div>
         </div>
-        <aside class="factbox" id="factbox"><dl><dt>Loading</dt><dd>…</dd></dl></aside>
+        <aside class="factbox" id="factbox" data-xl><dl><dt>Loading</dt><dd>…</dd></dl></aside>
       </div>
       <div class="links" id="ov-links"></div>
     </section>
@@ -405,8 +406,8 @@ footer{padding-block:24px 40px;color:var(--muted);font-size:.85rem}
     <section id="s-history">
       <h2>History</h2>
       <p class="lede">The detailed story of the place from the encyclopaedia, plus historic sites mapped nearby.</p>
-      <div id="hist-wiki"><p class="loading">Reading the history…</p></div>
-      <div id="hist-deep"></div>
+      <div id="hist-wiki" data-xl><p class="loading">Reading the history…</p></div>
+      <div id="hist-deep" data-xl></div>
       <h3>Historic sites nearby</h3>
       <div id="hist-sites"><p class="loading">Searching the map…</p></div>
       <div class="links" id="hist-links"></div>
@@ -427,7 +428,7 @@ footer{padding-block:24px 40px;color:var(--muted);font-size:.85rem}
     <section id="s-nature">
       <h2>Wildlife and birds</h2>
       <p class="lede" data-t-html>Species most often recorded within the search radius, from research-grade iNaturalist sightings. Tap <b>Hear the call</b> to play a real recording.</p>
-      <div id="nature-wiki"></div>
+      <div id="nature-wiki" data-xl></div>
       <div class="tabs" role="tablist" id="natureTabs"></div>
       <div id="nature"><p class="loading">Looking for birds and animals…</p></div>
       <div class="links" id="nature-links"></div>
@@ -437,17 +438,17 @@ footer{padding-block:24px 40px;color:var(--muted);font-size:.85rem}
       <h2>Climate</h2>
       <p class="lede">Monthly averages from 2015 to 2024 (ERA5 reanalysis via Open-Meteo).</p>
       <div id="climate"><p class="loading">Crunching ten years of weather…</p></div>
-      <div id="climate-wiki"></div>
+      <div id="climate-wiki" data-xl></div>
     </section>
 
     <section id="s-geology">
       <h2>Rivers, mountains and geology</h2>
       <p class="lede">The rivers that shape the land and where their names come from, the rocks under your feet, and the peaks around you.</p>
       <h3>Rivers and their names</h3>
-      <div id="rivers"><p class="loading">Tracing the waterways…</p></div>
-      <div id="geo-wiki"></div>
+      <div id="rivers" data-xl><p class="loading">Tracing the waterways…</p></div>
+      <div id="geo-wiki" data-xl></div>
       <h3>Rock units at this spot</h3>
-      <div id="geology"><p class="loading">Reading the geological map…</p></div>
+      <div id="geology" data-xl><p class="loading">Reading the geological map…</p></div>
       <h3>Mountains and peaks <span class="count" id="c-peaks"></span></h3>
       <div id="peaks"><p class="loading">Finding peaks…</p></div>
       <div class="links" id="geo-links"></div>
@@ -456,7 +457,7 @@ footer{padding-block:24px 40px;color:var(--muted);font-size:.85rem}
     <section id="s-farms">
       <h2>Farms and the land</h2>
       <p class="lede">Farms, wine estates and farm shops mapped in the area, and how the land around is used.</p>
-      <div id="farm-wiki"></div>
+      <div id="farm-wiki" data-xl></div>
       <div id="landuse"></div>
       <div id="farms"><p class="loading">Finding farms…</p></div>
     </section>
@@ -464,14 +465,14 @@ footer{padding-block:24px 40px;color:var(--muted);font-size:.85rem}
     <section id="s-people">
       <h2>Famous people</h2>
       <p class="lede">People with an encyclopaedia entry who were born, died or are buried in or near this place.</p>
-      <div id="people"><p class="loading">Looking up notable people…</p></div>
-      <div id="people-wiki"></div>
+      <div id="people" data-xl><p class="loading">Looking up notable people…</p></div>
+      <div id="people-wiki" data-xl></div>
     </section>
 
     <section id="s-nearby">
       <h2>Nearby sights with a story</h2>
       <p class="lede">Encyclopaedia entries about places within 10 km, nearest first.</p>
-      <div id="nearby"><p class="loading">Looking for nearby articles…</p></div>
+      <div id="nearby" data-xl><p class="loading">Looking for nearby articles…</p></div>
     </section>
 
     <section id="s-help">
@@ -806,6 +807,7 @@ function loadPlace(p) {
   map.setView([p.lat, p.lon], zoom);
   L.circle([p.lat, p.lon], { radius: S.radius, color: css("--pine"), weight: 1, fill: false, dashArray: "4 6", interactive: false }).addTo(centerLayer);
   if (p.gps) L.marker([p.lat, p.lon], { icon: L.divIcon({ className: "", html: '<div class="me-dot"></div>', iconSize: [16, 16] }) }).bindPopup(tr("You are here")).addTo(centerLayer);
+  xlPairs = []; xlShowing = true; $("#xlNote")?.remove();
   applySections();
   restorePlan();
   setTimeout(() => map.invalidateSize(), 50);
@@ -881,7 +883,7 @@ function sectionsHTML(secs, opts = {}) {
     const h = s.level <= 2 ? `<h3>${esc(s.title)}</h3>` : `<h4>${esc(s.title)}</h4>`;
     const ps = s.text.split(/\n+/).filter(Boolean);
     if (opts.collapse && ps.length > opts.collapse) {
-      return `${h}<div class="prose">${ps.slice(0, opts.collapse).map(p => `<p>${esc(p)}</p>`).join("")}</div><details class="more"><summary>${tr("Continue reading ({n} more paragraphs)", { n: ps.length - opts.collapse })}</summary><div class="prose">${ps.slice(opts.collapse).map(p => `<p>${esc(p)}</p>`).join("")}</div></details>`;
+      return `${h}<div class="prose">${ps.slice(0, opts.collapse).map(p => `<p>${esc(p)}</p>`).join("")}</div><details class="more"><summary class="ui">${tr("Continue reading ({n} more paragraphs)", { n: ps.length - opts.collapse })}</summary><div class="prose">${ps.slice(opts.collapse).map(p => `<p>${esc(p)}</p>`).join("")}</div></details>`;
     }
     return `${h}<div class="prose">${paras(s.text)}</div>`;
   }).join("");
@@ -1011,11 +1013,11 @@ async function loadWiki(live) {
       if (!live()) return; const hp = h.query?.pages?.[0];
       if (!hp || hp.missing || !hp.extract || hp.title === title) return;
       const hs = parseSections(hp.extract);
-      $("#hist-deep").innerHTML = `<div class="callout"><div class="eyebrow">${tr("In depth")}</div>${tr("There is a whole article on {link}. Expand the chapters below.", { link: `<a href="${wikiUrl(hp.title, lang)}" target="_blank" rel="noopener">${esc(hp.title)}</a>` })}</div>` +
+      $("#hist-deep").innerHTML = `<div class="callout"><div class="eyebrow">${tr("In depth")}</div><span class="ui">${tr("There is a whole article on {link}. Expand the chapters below.", { link: `<a href="${wikiUrl(hp.title, lang)}" target="_blank" rel="noopener">${esc(hp.title)}</a>` })}</span></div>` +
         hs.filter(s => s.text).map(s => `<details class="more"><summary>${esc(s.title === "Intro" ? tr("Introduction") : s.title)}</summary><div class="prose">${paras(s.text)}</div></details>`).join("");
     }).catch(() => {});
 
-    const put = (sel, cat, label) => { const ss = secs.filter(s => inCat(s, cat)); if (ss.length) $(sel).innerHTML = `<div class="callout"><div class="eyebrow">${esc(label)}</div>${lang === "af" ? tr("From the encyclopaedia article (Afrikaans)") : tr("From the encyclopaedia article")}</div>` + sectionsHTML(ss, { collapse: 4 }); };
+    const put = (sel, cat, label) => { const ss = secs.filter(s => inCat(s, cat)); if (ss.length) $(sel).innerHTML = `<div class="callout"><div class="eyebrow">${esc(label)}</div><span class="ui">${lang === "af" ? tr("From the encyclopaedia article (Afrikaans)") : tr("From the encyclopaedia article")}</span></div>` + sectionsHTML(ss, { collapse: 4 }); };
     put("#geo-wiki", "geo", tr("Landscape"));
     put("#climate-wiki", "climate", tr("Climate in words"));
     put("#nature-wiki", "nature", tr("Natural environment"));
@@ -1046,7 +1048,7 @@ function renderName(secs, full, f) {
   const o = nameOrigin(secs, full);
   const after = (f.namedAfter || []).map(n => n.wiki ? `<a href="${wikiUrl(n.wiki, n.wikiLang)}" target="_blank" rel="noopener">${esc(n.label)}</a>${n.desc ? ` (${esc(n.desc)})` : ""}` : esc(n.label)).join(", ");
   if (!o && !after) return;
-  $("#ov-name").innerHTML = `<div class="callout"><div class="eyebrow">${tr("Where the name comes from")}</div>${after ? `<p style="margin:0 0 6px">${tr("Named after {who}.", { who: after })}</p>` : ""}${o ? `<div class="prose">${paras(o.text.length > 1500 ? o.text.slice(0, 1500) + "…" : o.text)}</div>` : ""}</div>`;
+  $("#ov-name").innerHTML = `<div class="callout"><div class="eyebrow">${tr("Where the name comes from")}</div>${after ? `<p class="ui" style="margin:0 0 6px">${tr("Named after {who}.", { who: after })}</p>` : ""}${o ? `<div class="prose">${paras(o.text.length > 1500 ? o.text.slice(0, 1500) + "…" : o.text)}</div>` : ""}</div>`;
 }
 
 /* ---------- OpenStreetMap via Overpass ---------- */
@@ -1315,7 +1317,7 @@ function renderRivers(list) {
   const top = list.slice(0, 10), rest = list.slice(10);
   $("#rivers").innerHTML = top.map((r, i) => {
     const id = "rv" + i; markerIndex[id] = L.polyline(r.segs);
-    return `<div class="river" id="river-${i}"><h4>${esc(r.name)}</h4><div class="sub" style="color:var(--muted);font-size:.9rem">${tr(r.kind === "river" ? "River" : r.kind === "canal" ? "Canal" : "Stream")} · ${tr("{d} within the area", { d: km(r.len) })} · <button type="button" class="linkish" data-focus="${id}" style="background:none;border:0;padding:0;color:var(--pine);text-decoration:underline;cursor:pointer;font:inherit">${tr("Show on map")}</button></div><div class="origin">${loading(tr("Looking up the name…"))}</div></div>`;
+    return `<div class="river" id="river-${i}"><h4 class="ui">${esc(r.name)}</h4><div class="sub ui" style="color:var(--muted);font-size:.9rem">${tr(r.kind === "river" ? "River" : r.kind === "canal" ? "Canal" : "Stream")} · ${tr("{d} within the area", { d: km(r.len) })} · <button type="button" class="linkish" data-focus="${id}" style="background:none;border:0;padding:0;color:var(--pine);text-decoration:underline;cursor:pointer;font:inherit">${tr("Show on map")}</button></div><div class="origin">${loading(tr("Looking up the name…"))}</div></div>`;
   }).join("") + (rest.length ? `<details class="more showall"><summary>${tr("{n} more named streams", { n: rest.length })}</summary><p>${rest.map(r => esc(r.name)).join(" · ")}</p></details>` : "");
   top.forEach((r, i) => {
     riverStory(r).then(o => {
@@ -1323,9 +1325,9 @@ function renderRivers(list) {
       const el = document.querySelector(`#river-${i} .origin`); if (!el) return;
       const bits = [];
       if (o.desc || o.length) bits.push(`<p style="margin:0 0 4px">${esc([o.desc, o.length && tr("{n} km long in total", { n: o.length })].filter(Boolean).join(" · "))}</p>`);
-      if (o.namedAfter?.length) bits.push(`<p style="margin:0 0 4px"><b>${tr("Named after:")}</b> ${esc(o.namedAfter.join(", "))}</p>`);
-      if (o.tagEty) bits.push(`<p style="margin:0 0 4px"><b>${tr("Name origin:")}</b> ${esc(o.tagEty)}</p>`);
-      if (o.text) bits.push(`<p style="margin:0 0 4px" lang="${o.textLang}"><b>${o.textLang === "af" ? tr("The name (Afrikaans Wikipedia):") : tr("The name:")}</b> ${esc(o.text.length > 900 ? o.text.slice(0, 900) + "…" : o.text)}</p>`);
+      if (o.namedAfter?.length) bits.push(`<p style="margin:0 0 4px"><b class="ui">${tr("Named after:")}</b> ${esc(o.namedAfter.join(", "))}</p>`);
+      if (o.tagEty) bits.push(`<p style="margin:0 0 4px"><b class="ui">${tr("Name origin:")}</b> ${esc(o.tagEty)}</p>`);
+      if (o.text) bits.push(`<p style="margin:0 0 4px" lang="${o.textLang}"><b class="ui">${o.textLang === "af" ? tr("The name (Afrikaans Wikipedia):") : tr("The name:")}</b> ${esc(o.text.length > 900 ? o.text.slice(0, 900) + "…" : o.text)}</p>`);
       else if (o.intro) bits.push(`<p style="margin:0 0 4px">${esc(o.intro)}</p>`);
       if (!o.text && !o.tagEty && !o.namedAfter?.length) bits.push(`<p class="empty" style="margin:0 0 4px">${tr("No recorded origin for this name yet.")}</p>`);
       const links = [o.title && [o.lang === "af" ? tr("Wikipedia (Afrikaans)") : "Wikipedia", wikiUrl(o.title, o.lang)],
@@ -1543,9 +1545,9 @@ async function loadGeology(live) {
     const seen = new Set();
     units = units.filter(u => u.name && !seen.has(u.name) && seen.add(u.name)).slice(0, 4);
     if (!units.length) { $("#geology").innerHTML = `<p class="empty">${tr("No geological map covers this exact spot yet. Open the geological map link below to explore the surroundings.")}</p>`; return; }
-    $("#geology").innerHTML = units.map(u => `<div class="unit"><h4 style="margin:0">${esc(u.name)}</h4>
-      <div class="age">${esc([u.age, fmtAge(u.b, u.t)].filter(Boolean).join(" · "))}</div>
-      ${u.lith ? `<p style="margin:6px 0 0"><b>${tr("Rock types:")}</b> ${esc(u.lith)}</p>` : ""}
+    $("#geology").innerHTML = units.map(u => `<div class="unit"><h4 class="ui" style="margin:0">${esc(u.name)}</h4>
+      <div class="age ui">${esc([u.age, fmtAge(u.b, u.t)].filter(Boolean).join(" · "))}</div>
+      ${u.lith ? `<p style="margin:6px 0 0"><b class="ui">${tr("Rock types:")}</b> ${esc(u.lith)}</p>` : ""}
       ${u.descrip ? `<p style="margin:6px 0 0">${esc(u.descrip)}</p>` : ""}
       ${u.comments ? `<p style="margin:6px 0 0;color:var(--muted)">${esc(u.comments)}</p>` : ""}
       ${u.strat ? `<div class="links" style="margin-top:8px">${linkBtns([[tr("Read about the {name}", { name: u.strat }), `https://${LANG}.wikipedia.org/w/index.php?search=${encodeURIComponent(u.strat)}`]])}</div>` : ""}</div>`).join("");
@@ -1753,7 +1755,7 @@ async function loadPeople(live) {
     const list = [...people.values()].filter(p => p.name && !/^Q\d+$/.test(p.name)).sort((a, b) => b.links - a.links);
     if (!list.length) { $("#people").innerHTML = `<p class="empty">${tr("No notable people are recorded as born, died or buried {scope}.", { scope })}</p>`; return; }
     const yr = v => v ? (v.startsWith("-") ? v.slice(1, 5).replace(/^0+/, "") + " BC" : v.slice(0, 4)) : "";
-    const row = p => `<li><span class="ic" style="background:var(--hist)">${svg("book")}</span><div class="body"><div class="name"><a href="${esc(p.url)}" target="_blank" rel="noopener">${esc(p.name)}</a>${p.afOnly ? ` <span class="lang-tag">${tr("Afrikaans")}</span>` : ""} <span class="num">${esc([yr(p.birth), yr(p.death)].filter(Boolean).join("–"))}</span></div>${p.desc ? `<div class="sub">${esc(p.desc)}</div>` : ""}<div class="sub">${esc([...p.rels].map(x => tr({ born: "Born here", died: "Died here", buried: "Buried here" }[x])).join(" · "))}</div></div></li>`;
+    const row = p => `<li><span class="ic" style="background:var(--hist)">${svg("book")}</span><div class="body"><div class="name"><a href="${esc(p.url)}" target="_blank" rel="noopener">${esc(p.name)}</a>${p.afOnly ? ` <span class="lang-tag">${tr("Afrikaans")}</span>` : ""} <span class="num">${esc([yr(p.birth), yr(p.death)].filter(Boolean).join("–"))}</span></div>${p.desc ? `<div class="sub">${esc(p.desc)}</div>` : ""}<div class="sub ui">${esc([...p.rels].map(x => tr({ born: "Born here", died: "Died here", buried: "Buried here" }[x])).join(" · "))}</div></div></li>`;
     $("#people").innerHTML = `<ul class="items" style="max-width:720px">${list.slice(0, 15).map(row).join("")}</ul>` +
       (list.length > 15 ? `<details class="more showall"><summary>${tr("Show all {n}", { n: list.length })}</summary><ul class="items" style="max-width:720px">${list.slice(15).map(row).join("")}</ul></details>` : "");
   } catch (err) { if (live()) $("#people").innerHTML = errHTML(tr("Notable people did not load ({err}).", { err: err.message }), "people"); }
@@ -1775,7 +1777,7 @@ async function loadNearby(live) {
     pages.forEach(p => { const c = p.coordinates[0]; addPin("wiki", "w" + p.lang + p.pageid, c.lat, c.lon, popupHTML(p.title, p.description || "", c.lat, c.lon, [[p.lang === "af" ? tr("Wikipedia (Afrikaans)") : "Wikipedia", wikiUrl(p.title, p.lang)]])); });
     $("#nearby").innerHTML = `<div class="cols">${pages.map(p => `<article style="display:flex;gap:12px;align-items:flex-start;min-width:0" lang="${p.lang}">
       ${p.thumbnail ? `<img src="${esc(p.thumbnail.source)}" alt="" loading="lazy" style="width:84px;height:84px;object-fit:cover;border-radius:8px;flex:none">` : ""}
-      <div style="min-width:0"><div style="font:700 1.05rem var(--display)">${esc(p.title)} <span class="num">${km(p.dist)}</span>${p.lang === "af" ? ` <span class="lang-tag">${tr("Afrikaans")}</span>` : ""}</div>
+      <div style="min-width:0"><div class="ui" style="font:700 1.05rem var(--display)">${esc(p.title)} <span class="num">${km(p.dist)}</span>${p.lang === "af" ? ` <span class="lang-tag">${tr("Afrikaans")}</span>` : ""}</div>
       ${p.description ? `<div style="color:var(--muted);font-size:.88rem">${esc(p.description)}</div>` : ""}
       <p style="margin:4px 0;font-size:.95rem">${esc(p.extract || "")}</p>
       <div class="acts" style="display:flex;gap:12px;font-size:.88rem;flex-wrap:wrap"><button type="button" data-focus="w${p.lang}${p.pageid}" style="background:none;border:0;padding:0;color:var(--pine);text-decoration:underline;cursor:pointer;font:inherit">${tr("Show on map")}</button><a href="${wikiUrl(p.title, p.lang)}" target="_blank" rel="noopener">${tr("Read more")} ↗</a>${p.lang === "af" ? `<a href="${translateUrl(p.title, "af")}" target="_blank" rel="noopener">${tr("Translate")} ↗</a>` : ""}</div></div></article>`).join("")}</div>`;
@@ -2022,6 +2024,7 @@ function applySections() {
     for (const k of sec.layers || []) setLayer(k, show);
   }
   if (!hiddenSections.has("s-map") && map) setTimeout(() => map.invalidateSize(), 50);
+  if (typeof scheduleXL === "function") scheduleXL();
   const n = hiddenSections.size;
   $("#prefsBtn").lastChild.textContent = n ? tr("Choose sections ({n} hidden)", { n }) : tr("Choose sections");
   let note = $("#hiddenNote");
@@ -2137,6 +2140,71 @@ if (SR) {
   });
 }
 
+
+
+/* ---------- translating place content ---------- */
+// Text from Wikipedia, Wikidata, Macrostrat and the map arrives mostly in English. When the app is
+// set to another language, the server translates it; the app's own wording (class "ui") is left alone.
+const XL_SKIP = ".ui, .eyebrow, .lang-note, .links, .acts, button, a, .num, .lang-tag, .empty, .err, .loading, dt, summary.ui";
+const xlDone = new WeakSet(), xlMemo = new Map();
+let xlPairs = [], xlShowing = true, xlTimer = null, xlBusy = false;
+const srcLang = n => { const el = n.parentElement?.closest("[lang]"); return el && el !== document.documentElement ? el.lang.slice(0, 2) : "en"; };
+function xlCandidates() {
+  const out = [];
+  for (const root of document.querySelectorAll("#app [data-xl]")) {
+    if (root.closest("[hidden]")) continue;  // hidden sections aren't paid for until shown
+    const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    for (let n; (n = w.nextNode());) {
+      if (xlDone.has(n) || !/\p{L}{3}/u.test(n.nodeValue) || n.parentElement.closest(XL_SKIP) || srcLang(n) === UILANG) continue;
+      out.push(n);
+    }
+  }
+  return out;
+}
+function scheduleXL() { if (UILANG === "en") return; clearTimeout(xlTimer); xlTimer = setTimeout(runXL, 700); }
+function applyXL(n, tx) {
+  const orig = n.nodeValue, translated = orig.match(/^\s*/)[0] + tx + orig.match(/\s*$/)[0];
+  xlPairs.push([n, orig, translated]);
+  if (xlShowing) n.nodeValue = translated;
+  showXLNote();
+}
+async function runXL() {
+  if (xlBusy) return scheduleXL();
+  const nodes = xlCandidates(); if (!nodes.length) return;
+  xlBusy = true;
+  try {
+    const pending = [];
+    for (const n of nodes) { xlDone.add(n); const hit = xlMemo.get(n.nodeValue.trim()); hit ? applyXL(n, hit) : pending.push(n); }
+    const chunks = []; let cur = [], len = 0;
+    for (const n of pending) {
+      const t = n.nodeValue.trim();
+      if (cur.length && (cur.length >= 40 || len + t.length > 8000)) { chunks.push(cur); cur = []; len = 0; }
+      cur.push(n); len += t.length;
+    }
+    if (cur.length) chunks.push(cur);
+    for (const ch of chunks) {
+      const texts = ch.map(n => n.nodeValue.trim().slice(0, 4000));
+      try {
+        const d = await getJSON("/api/translate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ lang: UILANG, texts }) }, 120000);
+        d.translations.forEach((tx, i) => { if (tx) { xlMemo.set(texts[i], tx); applyXL(ch[i], tx); } });
+      } catch { /* the original text stays */ }
+    }
+  } finally { xlBusy = false; }
+}
+function showXLNote() {
+  let note = $("#xlNote");
+  if (!note) {
+    $("#s-overview h2").insertAdjacentHTML("afterend", `<p class="lang-note" id="xlNote">${tr("Text from Wikipedia and the map is translated into {lang} by AI.", { lang: UI_LANGS[UILANG] })} <button type="button" class="linkish" id="xlToggle"></button></p>`);
+    note = $("#xlNote");
+    $("#xlToggle").addEventListener("click", () => {
+      xlShowing = !xlShowing;
+      for (const [n, o, t] of xlPairs) if (n.isConnected) n.nodeValue = xlShowing ? t : o;
+      showXLNote();
+    });
+  }
+  $("#xlToggle").textContent = xlShowing ? tr("Show original") : tr("Show translation");
+}
+if (UILANG !== "en") new MutationObserver(scheduleXL).observe($("#app"), { childList: true, subtree: true });
 
 /* ---------- interface language ---------- */
 function translatePage() {

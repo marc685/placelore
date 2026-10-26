@@ -187,6 +187,58 @@ async function plan(req, res) {
   }
 }
 
+
+/* ---------- Translate place content ---------- */
+// Wikipedia and Wikidata text mostly exists in English (some Afrikaans); this puts it into the
+// reader's language. Each text is translated once and kept in memory.
+const xlCache = new Map(), XL_MAX = 8000;
+const xlHits = new Map();
+function xlLimited(ip) {
+  const now = Date.now(), recent = (xlHits.get(ip) || []).filter(t => now - t < 600_000);
+  recent.push(now); xlHits.set(ip, recent); if (xlHits.size > 5000) xlHits.clear();
+  return recent.length > 200;
+}
+const XL_SCHEMA = { type: "object", additionalProperties: false, required: ["translations"], properties: { translations: { type: "array", items: { type: "string" } } } };
+async function translate(req, res) {
+  const ip = (req.headers["x-forwarded-for"] || req.socket.remoteAddress || "").split(",")[0].trim();
+  const send = (code, obj) => { res.writeHead(code, { "Content-Type": "application/json" }); res.end(JSON.stringify(obj)); };
+  if (xlLimited(ip)) return send(429, { error: "too many requests" });
+  const anthropic = await getClient();
+  if (!anthropic) return send(503, { error: "no key" });
+  let body;
+  try { body = JSON.parse(await readBody(req)); } catch { return send(400, { error: "bad request" }); }
+  const lang = LANGS[body.lang] && body.lang !== "en" ? body.lang : null;
+  const texts = Array.isArray(body.texts) ? body.texts.map(t => String(t).slice(0, 4000)) : [];
+  if (!lang || !texts.length || texts.length > 60 || texts.join("").length > 20_000) return send(400, { error: "bad request" });
+  const out = texts.map(t => xlCache.get(lang + "\u0000" + t));
+  const todo = texts.map((t, i) => out[i] === undefined ? i : -1).filter(i => i >= 0);
+  if (todo.length) {
+    try {
+      const msg = await anthropic.beta.messages.create({
+        model: MODEL,
+        max_tokens: 16000,
+        output_config: { effort: "low", format: { type: "json_schema", schema: XL_SCHEMA } },
+        betas: ["server-side-fallback-2026-07-01"],
+        fallbacks: "default",
+        system: `You translate text for a travel app into ${LANGS[lang]}. You receive a JSON array of strings, mostly English and some Afrikaans, from Wikipedia and map data about a place. Return "translations": the same number of strings, in the same order, each translated into natural, plain ${LANGS[lang]} for travellers.
+Keep names of people, places, rivers, mountains, farms, buildings and organisations as they are. Keep numbers, dates, units and measurements exact. A string that is only a name, number or code comes back unchanged. Translate everything else in full; add nothing and leave nothing out.`,
+        messages: [{ role: "user", content: JSON.stringify(todo.map(i => texts[i])) }]
+      });
+      const got = JSON.parse(msg.content.filter(b => b.type === "text").map(b => b.text).join("")).translations;
+      if (msg.stop_reason !== "end_turn" || !Array.isArray(got) || got.length !== todo.length) throw new Error("translation came back incomplete");
+      todo.forEach((i, k) => {
+        out[i] = got[k];
+        xlCache.set(lang + "\u0000" + texts[i], got[k]);
+        if (xlCache.size > XL_MAX) xlCache.delete(xlCache.keys().next().value);
+      });
+    } catch (err) {
+      console.error("translate error", err?.status, err?.message);
+      return send(err?.status === 429 || err?.status >= 500 ? 503 : 500, { error: "translation failed" });
+    }
+  }
+  send(200, { translations: out });
+}
+
 /* ---------- Overpass and Wikidata relay ---------- */
 const OVERPASS = ["https://overpass-api.de/api/interpreter", "https://overpass.kumi.systems/api/interpreter", "https://overpass.private.coffee/api/interpreter"];
 const UA = "Placelore/1.0 (https://github.com/marc685/placelore)";
@@ -266,6 +318,10 @@ http.createServer((req, res) => {
   if (req.url.startsWith("/api/plan")) {
     if (req.method !== "POST") { res.writeHead(405); return res.end(); }
     return plan(req, res).catch(err => { console.error(err); if (!res.headersSent) res.writeHead(500); res.end(); });
+  }
+  if (req.url.startsWith("/api/translate")) {
+    if (req.method !== "POST") { res.writeHead(405); return res.end(); }
+    return translate(req, res).catch(err => { console.error(err); if (!res.headersSent) res.writeHead(500); res.end(); });
   }
   if (req.url.startsWith("/api/overpass")) return relay(req, res, "overpass").catch(err => { console.error(err); if (!res.headersSent) res.writeHead(500); res.end(); });
   if (req.url.startsWith("/api/sparql")) return relay(req, res, "sparql").catch(err => { console.error(err); if (!res.headersSent) res.writeHead(500); res.end(); });

@@ -579,7 +579,10 @@ window.I18N = {
   "Warm-summer humid continental": "Vogtig kontinentaal met louwarm somers",
   "Subarctic": "Subarkties",
   "Tundra": "Toendra",
-  "Ice cap": "Yskap"
+  "Ice cap": "Yskap",
+  "Text from Wikipedia and the map is translated into {lang} by AI.": "Teks uit Wikipedia en die kaart word deur KI in {lang} vertaal.",
+  "Show original": "Wys oorspronklike",
+  "Show translation": "Wys vertaling"
  },
  "st": {
   "the server is busy": "seva e phathehile",
@@ -1129,7 +1132,10 @@ window.I18N = {
   "Police": "Sepolesa",
   "Fire": "Mollo",
   "Fire and ambulance": "Mollo le ambulense",
-  "Ambulance (SAMU)": "Ambulense (SAMU)"
+  "Ambulance (SAMU)": "Ambulense (SAMU)",
+  "Text from Wikipedia and the map is translated into {lang} by AI.": "Mongolo o tswang ho Wikipedia le mmapeng o fetoletswe ho {lang} ke AI.",
+  "Show original": "Bontsha ya pele",
+  "Show translation": "Bontsha phetolelo"
  },
  "zu": {
   "the server is busy": "iseva imatasa",
@@ -1679,6 +1685,9 @@ window.I18N = {
   "Police": "Amaphoyisa",
   "Fire": "Abacimi bomlilo",
   "Fire and ambulance": "Abacimi bomlilo ne-ambulensi",
-  "Ambulance (SAMU)": "I-ambulensi (SAMU)"
+  "Ambulance (SAMU)": "I-ambulensi (SAMU)",
+  "Text from Wikipedia and the map is translated into {lang} by AI.": "Umbhalo ovela ku-Wikipedia nasemephini uhunyushelwe ku-{lang} yi-AI.",
+  "Show original": "Bonisa okwangempela",
+  "Show translation": "Bonisa ukuhumusha"
  }
 };
