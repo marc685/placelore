@@ -9,6 +9,7 @@ import { fileURLToPath } from "node:url";
 const here = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 8080;
 const MODEL = "claude-opus-5-5";
+const LANGS = { en: "English", af: "Afrikaans", st: "Sesotho (Southern Sotho)", zu: "isiZulu" };
 const LIMITS = { bodyBytes: 200_000, messages: 20, messageChars: 4000, contextChars: 60_000, perIpPer10Min: 30 };
 
 const SYSTEM = `You are the Placelore guide, a friendly local expert for travellers in a place they are visiting.
@@ -97,7 +98,7 @@ async function chat(req, res) {
       system: [
         { type: "text", text: SYSTEM },
         // The place data stays the same for every question about one place, so it is cached
-        { type: "text", text: `Place: ${place}\n\nPlace data loaded in the app:\n${context}`, cache_control: { type: "ephemeral" } }
+        { type: "text", text: `The traveller's app is set to ${LANGS[body.lang] || "English"}. Reply in ${LANGS[body.lang] || "English"} unless they write to you in another language.\n\nPlace: ${place}\n\nPlace data loaded in the app:\n${context}`, cache_control: { type: "ephemeral" } }
       ],
       messages
     }, { signal: controller.signal });
@@ -161,6 +162,7 @@ async function plan(req, res) {
     `About the place: ${String(body.about || "").slice(0, 2000)}`,
     `Day: ${String(body.today || "").slice(0, 600)}`,
     `Who and how: ${String(body.prefs || "").slice(0, 600)}`,
+    `Language: write every text field (title, summary, stop titles, activities, tips, notes) in ${LANGS[body.lang] || "English"}. Keep place_name exactly as given in the list.`,
     `Candidate places (id | kind | name | distance from the centre | details):\n${candidates}`
   ].join("\n\n");
   try {

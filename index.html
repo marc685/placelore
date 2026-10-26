@@ -277,13 +277,19 @@ footer{padding-block:24px 40px;color:var(--muted);font-size:.85rem}
       <option value="20">20 km</option>
       <option value="30">30 km</option>
     </select>
+    <select class="radius" id="uilang" aria-label="Language">
+      <option value="en">English</option>
+      <option value="af">Afrikaans</option>
+      <option value="st">Sesotho</option>
+      <option value="zu">isiZulu</option>
+    </select>
   </div>
 </header>
 
 <div id="welcome" class="wrap welcome">
   <div class="eyebrow">A field guide to wherever you are</div>
   <h1>Every place has a story.</h1>
-  <p>Tap <b>Where am I?</b> to use your phone's GPS, or type a town name. You'll get its history, where the names of its rivers come from, walking trails, camp and picnic sites, farms, wildlife and birds, climate, geology and mountains, with links to read more on each.</p>
+  <p data-t-html>Tap <b>Where am I?</b> to use your phone's GPS, or type a town name. You'll get its history, where the names of its rivers come from, walking trails, camp and picnic sites, farms, wildlife and birds, climate, geology and mountains, with links to read more on each.</p>
   <div class="row">
     <button class="btn primary" type="button" id="gpsBtn2">Use my location</button>
     <button class="btn" type="button" data-example="Stellenbosch">Try Stellenbosch</button>
@@ -420,7 +426,7 @@ footer{padding-block:24px 40px;color:var(--muted);font-size:.85rem}
 
     <section id="s-nature">
       <h2>Wildlife and birds</h2>
-      <p class="lede">Species most often recorded within the search radius, from research-grade iNaturalist sightings. Tap <b>Hear the call</b> to play a real recording.</p>
+      <p class="lede" data-t-html>Species most often recorded within the search radius, from research-grade iNaturalist sightings. Tap <b>Hear the call</b> to play a real recording.</p>
       <div id="nature-wiki"></div>
       <div class="tabs" role="tablist" id="natureTabs"></div>
       <div id="nature"><p class="loading">Looking for birds and animals…</p></div>
@@ -508,6 +514,7 @@ footer{padding-block:24px 40px;color:var(--muted);font-size:.85rem}
   </form>
 </div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="i18n.js"></script>
 <script>
 "use strict";
 /* ---------- helpers ---------- */
@@ -515,6 +522,20 @@ const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const qs = o => new URLSearchParams(o).toString();
 const LANG = "en";
+/* Interface language. Dictionaries live in i18n.js; English is the source and the fallback. */
+const UI_LANGS = { en: "English", af: "Afrikaans", st: "Sesotho", zu: "isiZulu" };
+const UILANG = (() => {
+  try { const v = JSON.parse(localStorage.getItem("placelore.uilang")); if (UI_LANGS[v]) return v; } catch {}
+  const n = (navigator.language || "").slice(0, 2).toLowerCase(); return UI_LANGS[n] ? n : "en";
+})();
+const tr = (s, v) => {
+  let out = (window.I18N && window.I18N[UILANG] && window.I18N[UILANG][s]) || s;
+  if (v) out = out.replace(/\{(\w+)\}/g, (m, k) => v[k] ?? m);
+  return out;
+};
+// Dates and month names in the interface language where the browser knows it
+const LOCALE = (() => { const want = { en: "en-ZA", af: "af-ZA", st: "st-ZA", zu: "zu-ZA" }[UILANG]; try { return Intl.DateTimeFormat.supportedLocalesOf([want]).length ? want : "en-ZA"; } catch { return "en-ZA"; } })();
+document.documentElement.lang = UILANG;
 /* Every response a place loads is kept in RECORD so it can be saved as an offline pack;
    when the network fails, the saved pack answers instead. */
 let RECORD = new Map(), ACTIVE_PACK = null, inflight = 0;
@@ -528,13 +549,13 @@ async function getJSON(url, opts = {}, ms = 30000) {
   inflight++;
   const c = new AbortController(); const t = setTimeout(() => c.abort(), ms);
   try {
-    const r = await fetch(url, { ...opts, signal: c.signal }); if (!r.ok) throw Object.assign(new Error(r.status === 429 ? "the server is busy" : r.status === 502 ? "the map and data servers are busy right now" : `${r.status} ${r.statusText}`), { status: r.status });
+    const r = await fetch(url, { ...opts, signal: c.signal }); if (!r.ok) throw Object.assign(new Error(r.status === 429 ? tr("the server is busy") : r.status === 502 ? tr("the map and data servers are busy right now") : `${r.status} ${r.statusText}`), { status: r.status });
     const data = await r.json();
     if (recordable(url)) RECORD.set(key, data);
     return data;
   } catch (e) {
     const d = await fromPack(); if (d !== undefined) { RECORD.set(key, d); return d; }
-    throw e.name === "AbortError" ? new Error("the server took too long to answer") : e.message === "Failed to fetch" ? new Error(navigator.onLine ? "no connection to the server" : "you're offline and this isn't saved") : e;
+    throw e.name === "AbortError" ? new Error(tr("the server took too long to answer")) : e.message === "Failed to fetch" ? new Error(navigator.onLine ? tr("no connection to the server") : tr("you're offline and this isn't saved")) : e;
   } finally {
     clearTimeout(t); inflight--;
     if (!inflight) setTimeout(() => { if (!inflight) idleWaiters.splice(0).forEach(f => f()); }, 1500);
@@ -554,12 +575,12 @@ function haversine(a, b) {
 }
 const km = m => m < 1000 ? `${Math.round(m)} m` : `${(m / 1000).toFixed(m < 10000 ? 1 : 0)} km`;
 const loading = t => `<p class="loading">${esc(t)}</p>`;
-const errHTML = (msg, fn) => `<p class="err">${esc(msg)} <button class="btn" type="button" data-retry="${fn}">Try again</button></p>`;
+const errHTML = (msg, fn) => `<p class="err">${esc(msg)} <button class="btn" type="button" data-retry="${fn}">${tr("Try again")}</button></p>`;
 const paras = text => text.split(/\n+/).map(s => s.trim()).filter(Boolean).map(p => `<p>${esc(p)}</p>`).join("");
 const sentences = text => text.replace(/\n*={2,6}[^=\n]+={2,6}\n*/g, "\n").replace(/\s+/g, " ").split(/(?<=[.!?])\s+(?=[A-Z0-9"“(])/);
 const wikiUrl = (t, lang = "en") => `https://${lang}.wikipedia.org/wiki/${encodeURIComponent(t.replace(/ /g, "_"))}`;
 const translateUrl = (t, lang) => `https://translate.google.com/translate?sl=${lang}&tl=en&u=${encodeURIComponent(wikiUrl(t, lang))}`;
-const LANG_NAME = { en: "English", af: "Afrikaans" };
+const LANG_NAME = { en: tr("English"), af: tr("Afrikaans") };
 function wikiTagUrl(tag) { if (!tag) return null; const m = tag.match(/^([a-z-]+):(.+)$/); return m ? `https://${m[1]}.wikipedia.org/wiki/${encodeURIComponent(m[2].replace(/ /g, "_"))}` : null; }
 const linkBtns = arr => arr.filter(Boolean).map(([t, u]) => `<a href="${esc(u)}" target="_blank" rel="noopener">${esc(t)}</a>`).join("");
 const store = { get(k, d) { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } }, set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} } };
@@ -598,19 +619,19 @@ function candFromMarkers(kind, items) {
 }
 
 const LAYERS = [
-  { key: "trails", label: "Trails", color: "--trail", icon: "boot" },
-  { key: "camp", label: "Camping", color: "--camp", icon: "tent" },
-  { key: "picnic", label: "Picnic", color: "--picnic", icon: "table" },
-  { key: "farm", label: "Farms", color: "--farm", icon: "barn" },
-  { key: "peak", label: "Peaks", color: "--peak", icon: "peak" },
-  { key: "river", label: "Rivers", color: "--river", icon: "wave" },
-  { key: "hist", label: "Historic", color: "--hist", icon: "hist" },
-  { key: "view", label: "Viewpoints & reserves", color: "--ochre", icon: "eye" },
-  { key: "wiki", label: "Encyclopaedia", color: "--wiki", icon: "book" },
-  { key: "stay", label: "Stays", color: "--stay", icon: "bed" },
-  { key: "fun", label: "Recreation", color: "--fun", icon: "ball" },
-  { key: "help", label: "Help & fuel", color: "--help", icon: "cross" },
-  { key: "plan", label: "Day plan", color: "--ochre", icon: "peak" }
+  { key: "trails", label: tr("Trails"), color: "--trail", icon: "boot" },
+  { key: "camp", label: tr("Camping"), color: "--camp", icon: "tent" },
+  { key: "picnic", label: tr("Picnic"), color: "--picnic", icon: "table" },
+  { key: "farm", label: tr("Farms"), color: "--farm", icon: "barn" },
+  { key: "peak", label: tr("Peaks"), color: "--peak", icon: "peak" },
+  { key: "river", label: tr("Rivers"), color: "--river", icon: "wave" },
+  { key: "hist", label: tr("Historic"), color: "--hist", icon: "hist" },
+  { key: "view", label: tr("Viewpoints & reserves"), color: "--ochre", icon: "eye" },
+  { key: "wiki", label: tr("Encyclopaedia"), color: "--wiki", icon: "book" },
+  { key: "stay", label: tr("Stays"), color: "--stay", icon: "bed" },
+  { key: "fun", label: tr("Recreation"), color: "--fun", icon: "ball" },
+  { key: "help", label: tr("Help & fuel"), color: "--help", icon: "cross" },
+  { key: "plan", label: tr("Day plan"), color: "--ochre", icon: "peak" }
 ];
 
 /* ---------- map ---------- */
@@ -623,7 +644,7 @@ function initMap() {
   const hike = L.tileLayer("https://tile.waymarkedtrails.org/hiking/{z}/{x}/{y}.png", { maxZoom: 18, attribution: "© waymarkedtrails.org" });
   topo.addTo(map); currentBase = topo;
   map.on("baselayerchange", e => { currentBase = e.layer; });
-  L.control.layers({ "Terrain": topo, "Street map": osm, "Satellite": sat }, { "Marked hiking routes (overlay)": hike }).addTo(map);
+  L.control.layers({ [tr("Terrain")]: topo, [tr("Street map")]: osm, [tr("Satellite")]: sat }, { [tr("Marked hiking routes (overlay)")]: hike }).addTo(map);
   L.control.scale({ imperial: false }).addTo(map);
   const tg = $("#toggles");
   for (const l of LAYERS) {
@@ -641,7 +662,7 @@ function pinIcon(key) {
 }
 function popupHTML(name, sub, lat, lon, extra = []) {
   const links = [
-    ["Directions", `https://www.google.com/maps/dir/?api=1&destination=${lat},${lon}`],
+    [tr("Directions"), `https://www.google.com/maps/dir/?api=1&destination=${lat},${lon}`],
     ...extra
   ];
   return `<b>${esc(name)}</b>${sub ? `<div>${esc(sub)}</div>` : ""}<div class="pl">${links.map(([t, u]) => `<a href="${esc(u)}" target="_blank" rel="noopener">${esc(t)}</a>`).join("")}</div>`;
@@ -676,10 +697,10 @@ function placeFromNominatim(r) {
   };
 }
 async function searchPlaces(q) {
-  return getJSON(`${NOM}/search?${qs({ q, format: "jsonv2", limit: 6, extratags: 1, addressdetails: 1, "accept-language": LANG })}`);
+  return getJSON(`${NOM}/search?${qs({ q, format: "jsonv2", limit: 6, extratags: 1, addressdetails: 1, "accept-language": `${UILANG},en` })}`);
 }
 async function reverse(lat, lon) {
-  const r = await getJSON(`${NOM}/reverse?${qs({ lat, lon, format: "jsonv2", zoom: 12, extratags: 1, addressdetails: 1, "accept-language": LANG })}`);
+  const r = await getJSON(`${NOM}/reverse?${qs({ lat, lon, format: "jsonv2", zoom: 12, extratags: 1, addressdetails: 1, "accept-language": `${UILANG},en` })}`);
   const p = placeFromNominatim(r);
   const a = r.address || {};
   p.name = a.city || a.town || a.village || a.hamlet || a.suburb || a.municipality || p.name;
@@ -703,7 +724,7 @@ const sug = $("#suggest");
 $("#searchForm").addEventListener("submit", async e => {
   e.preventDefault();
   const q = $("#q").value.trim(); if (!q) return;
-  sug.hidden = false; sug.innerHTML = `<button type="button" disabled>Searching…</button>`;
+  sug.hidden = false; sug.innerHTML = `<button type="button" disabled>${tr("Searching…")}</button>`;
   try {
     const SETTLEMENT = ["city", "town", "village", "hamlet", "suburb", "neighbourhood", "isolated_dwelling", "farm"];
     const rank = r => SETTLEMENT.includes(r.addresstype) ? 0 : /municipality|district|county|state|region/.test(r.addresstype || r.type) ? 2 : 1;
@@ -711,24 +732,24 @@ $("#searchForm").addEventListener("submit", async e => {
     const res = (await searchPlaces(q)).map((r, i) => ({ r, i })).sort((a, b) => rank(a.r) - rank(b.r) || a.i - b.i).map(x => x.r);
     const exact = res.find(r => rank(r) === 0 && (r.name || "").toLowerCase() === q.toLowerCase().split(",")[0].trim());
     if (exact && res.filter(r => rank(r) === 0 && (r.name || "").toLowerCase() === exact.name.toLowerCase()).length === 1) { sug.hidden = true; return loadPlace(placeFromNominatim(exact)); }
-    if (!res.length) { sug.innerHTML = `<button type="button" disabled>No place found called “${esc(q)}”. Check the spelling or add the country.</button>`; return; }
+    if (!res.length) { sug.innerHTML = `<button type="button" disabled>${tr("No place found called “{q}”. Check the spelling or add the country.", { q: esc(q) })}</button>`; return; }
     if (res.length === 1) { sug.hidden = true; return loadPlace(placeFromNominatim(res[0])); }
     sug.innerHTML = res.map((r, i) => `<button type="button" data-i="${i}">${esc(r.name || r.display_name.split(",")[0])}<small>${esc(r.display_name)}</small></button>`).join("");
     sug.querySelectorAll("[data-i]").forEach(b => b.addEventListener("click", () => { sug.hidden = true; loadPlace(placeFromNominatim(res[+b.dataset.i])); }));
-  } catch (err) { sug.innerHTML = `<button type="button" disabled>Search failed (${esc(err.message)}). Check your connection.</button>`; }
+  } catch (err) { sug.innerHTML = `<button type="button" disabled>${tr("Search failed ({err}). Check your connection.", { err: esc(err.message) })}</button>`; }
 });
 document.addEventListener("click", e => { if (!e.target.closest("#searchForm")) sug.hidden = true; });
 
 function useGPS() {
-  if (!navigator.geolocation) { alertBand("This browser has no GPS access. Type a town name instead."); return; }
-  const btn = $("#gpsBtn"); btn.disabled = true; btn.lastChild.textContent = " Locating…";
+  if (!navigator.geolocation) { alertBand(tr("This browser has no GPS access. Type a town name instead.")); return; }
+  const btn = $("#gpsBtn"); btn.disabled = true; btn.lastChild.textContent = " " + tr("Locating…");
   navigator.geolocation.getCurrentPosition(async pos => {
-    btn.disabled = false; btn.lastChild.textContent = " Where am I?";
+    btn.disabled = false; btn.lastChild.textContent = " " + tr("Where am I?");
     try { const p = await reverse(pos.coords.latitude, pos.coords.longitude); loadPlace(p); }
-    catch (err) { loadPlace({ name: "Your location", region: "", lat: pos.coords.latitude, lon: pos.coords.longitude, kind: "location", gps: true }); }
+    catch (err) { loadPlace({ name: tr("Your location"), region: "", lat: pos.coords.latitude, lon: pos.coords.longitude, kind: "location", gps: true }); }
   }, err => {
-    btn.disabled = false; btn.lastChild.textContent = " Where am I?";
-    alertBand(err.code === 1 ? "Location permission was denied. Allow location for this site in your browser settings, or type a town name." : "Could not get a GPS fix. Try again outdoors, or type a town name.");
+    btn.disabled = false; btn.lastChild.textContent = " " + tr("Where am I?");
+    alertBand(err.code === 1 ? tr("Location permission was denied. Allow location for this site in your browser settings, or type a town name.") : tr("Could not get a GPS fix. Try again outdoors, or type a town name."));
   }, { enableHighAccuracy: true, timeout: 20000, maximumAge: 60000 });
 }
 function alertBand(msg) {
@@ -761,7 +782,7 @@ function loadPlace(p) {
   $("#welcome").hidden = true; $("#app").hidden = false; $("#askFab").hidden = false; chatSwitch();
   document.title = `${p.name} · Placelore`;
   $("#placeName").textContent = p.name;
-  $("#placeKind").textContent = p.gps ? `You are here · ${p.kind || "location"}` : (p.kind || "place");
+  $("#placeKind").textContent = p.gps ? tr("You are here · {kind}", { kind: tr(p.kind || "location") }) : tr(p.kind || "place");
   $("#placeRegion").textContent = p.region || "";
   $("#placeCoords").textContent = `${p.lat.toFixed(4)}°, ${p.lon.toFixed(4)}°`;
   $("#placeElev").textContent = ""; $("#weatherNow").hidden = true;
@@ -772,11 +793,11 @@ function loadPlace(p) {
   try { history.replaceState(null, "", `?q=${encodeURIComponent(p.name)}&lat=${p.lat.toFixed(5)}&lon=${p.lon.toFixed(5)}`); } catch {}
 
   // reset UI
-  const reset = { "#ov-intro": "Finding the encyclopaedia entry…", "#ov-facts": "Gathering facts…", "#hist-wiki": "Reading the history…", "#hist-sites": "Searching the map…", "#rivers": "Tracing the waterways…", "#trails": "Loading trails…", "#camping": "Loading camp sites…", "#picnic": "Loading picnic spots…", "#views": "Loading…", "#nature": "Looking for birds and animals…", "#climate": "Crunching ten years of weather…", "#geology": "Reading the geological map…", "#peaks": "Finding peaks…", "#farms": "Finding farms…", "#nearby": "Looking for nearby articles…", "#stay": "Finding places to stay…", "#people": "Looking up notable people…", "#help-numbers": "Checking which country you're in…", "#fun": "Finding things to do…" };
+  const reset = { "#ov-intro": tr("Finding the encyclopaedia entry…"), "#ov-facts": tr("Gathering facts…"), "#hist-wiki": tr("Reading the history…"), "#hist-sites": tr("Searching the map…"), "#rivers": tr("Tracing the waterways…"), "#trails": tr("Loading trails…"), "#camping": tr("Loading camp sites…"), "#picnic": tr("Loading picnic spots…"), "#views": tr("Loading…"), "#nature": tr("Looking for birds and animals…"), "#climate": tr("Crunching ten years of weather…"), "#geology": tr("Reading the geological map…"), "#peaks": tr("Finding peaks…"), "#farms": tr("Finding farms…"), "#nearby": tr("Looking for nearby articles…"), "#stay": tr("Finding places to stay…"), "#people": tr("Looking up notable people…"), "#help-numbers": tr("Checking which country you're in…"), "#fun": tr("Finding things to do…") };
   for (const [k, v] of Object.entries(reset)) $(k).innerHTML = loading(v);
   for (const k of ["#ov-name", "#hist-deep", "#nature-wiki", "#climate-wiki", "#geo-wiki", "#farm-wiki", "#landuse", "#people-wiki", "#help-places"]) $(k).innerHTML = "";
   for (const k of ["#c-trails", "#c-camp", "#c-picnic", "#c-view", "#c-peaks"]) $(k).textContent = "";
-  $("#factbox").innerHTML = `<dl><dt>Loading</dt><dd>…</dd></dl>`;
+  $("#factbox").innerHTML = `<dl><dt>${tr("Loading")}</dt><dd>…</dd></dl>`;
   setLinks();
 
   initMap();
@@ -784,7 +805,7 @@ function loadPlace(p) {
   const zoom = S.radius <= 5000 ? 13 : S.radius <= 10000 ? 12 : S.radius <= 20000 ? 11 : 10;
   map.setView([p.lat, p.lon], zoom);
   L.circle([p.lat, p.lon], { radius: S.radius, color: css("--pine"), weight: 1, fill: false, dashArray: "4 6", interactive: false }).addTo(centerLayer);
-  if (p.gps) L.marker([p.lat, p.lon], { icon: L.divIcon({ className: "", html: '<div class="me-dot"></div>', iconSize: [16, 16] }) }).bindPopup("You are here").addTo(centerLayer);
+  if (p.gps) L.marker([p.lat, p.lon], { icon: L.divIcon({ className: "", html: '<div class="me-dot"></div>', iconSize: [16, 16] }) }).bindPopup(tr("You are here")).addTo(centerLayer);
   applySections();
   restorePlan();
   setTimeout(() => map.invalidateSize(), 50);
@@ -806,28 +827,28 @@ function setLinks(title, lang = "en") {
   const n = S.name, ll = `${S.lat},${S.lon}`;
   const wl = title ? wikiUrl(title, lang) : `https://en.wikipedia.org/w/index.php?search=${encodeURIComponent(n)}`;
   $("#ov-links").innerHTML = linkBtns([
-    ["Wikipedia", wl], ["Wikivoyage travel guide", `https://en.wikivoyage.org/w/index.php?search=${encodeURIComponent(n)}`],
+    ["Wikipedia", wl], [tr("Wikivoyage travel guide"), `https://en.wikivoyage.org/w/index.php?search=${encodeURIComponent(n)}`],
     ["OpenStreetMap", `https://www.openstreetmap.org/#map=13/${S.lat}/${S.lon}`], ["Google Maps", `https://www.google.com/maps/search/?api=1&query=${ll}`]
   ]);
   $("#hist-links").innerHTML = linkBtns([
-    ["Full article", wl],
-    ["Search: history of " + n, `https://www.google.com/search?q=${encodeURIComponent("history of " + n + " " + (S.region || ""))}`],
-    ["Old maps of the area", `https://www.oldmapsonline.org/en/#position=13/${S.lat}/${S.lon}`],
-    ["Wikimedia Commons photos", `https://commons.wikimedia.org/w/index.php?search=${encodeURIComponent(n)}`]
+    [tr("Full article"), wl],
+    [tr("Search: history of {place}", { place: n }), `https://www.google.com/search?q=${encodeURIComponent("history of " + n + " " + (S.region || ""))}`],
+    [tr("Old maps of the area"), `https://www.oldmapsonline.org/en/#position=13/${S.lat}/${S.lon}`],
+    [tr("Wikimedia Commons photos"), `https://commons.wikimedia.org/w/index.php?search=${encodeURIComponent(n)}`]
   ]);
   $("#out-links").innerHTML = linkBtns([
-    ["Waymarked hiking routes", `https://hiking.waymarkedtrails.org/#?map=13/${S.lat}/${S.lon}`],
+    [tr("Waymarked hiking routes"), `https://hiking.waymarkedtrails.org/#?map=13/${S.lat}/${S.lon}`],
     ["AllTrails", `https://www.alltrails.com/search?q=${encodeURIComponent(n)}`],
-    ["Campsites on Google Maps", `https://www.google.com/maps/search/campsite/@${ll},12z`]
+    [tr("Campsites on Google Maps"), `https://www.google.com/maps/search/campsite/@${ll},12z`]
   ]);
   $("#nature-links").innerHTML = linkBtns([
-    ["All sightings on iNaturalist", `https://www.inaturalist.org/observations?lat=${S.lat}&lng=${S.lon}&radius=${S.radius / 1000}&view=species`],
-    ["Birding hotspots on eBird", `https://ebird.org/hotspots?env.lat=${S.lat}&env.lon=${S.lon}&env.minX=${S.lon - .2}&env.maxX=${S.lon + .2}&env.minY=${S.lat - .2}&env.maxY=${S.lat + .2}`]
+    [tr("All sightings on iNaturalist"), `https://www.inaturalist.org/observations?lat=${S.lat}&lng=${S.lon}&radius=${S.radius / 1000}&view=species`],
+    [tr("Birding hotspots on eBird"), `https://ebird.org/hotspots?env.lat=${S.lat}&env.lon=${S.lon}&env.minX=${S.lon - .2}&env.maxX=${S.lon + .2}&env.minY=${S.lat - .2}&env.maxY=${S.lat + .2}`]
   ]);
   $("#geo-links").innerHTML = linkBtns([
-    ["Geological map (Macrostrat)", `https://macrostrat.org/map/#x=${S.lon}&y=${S.lat}&z=11`],
-    ["Peaks on PeakVisor", `https://peakvisor.com/search?q=${encodeURIComponent(n)}`],
-    ["Search: geology of " + n, `https://www.google.com/search?q=${encodeURIComponent("geology of " + n)}`]
+    [tr("Geological map (Macrostrat)"), `https://macrostrat.org/map/#x=${S.lon}&y=${S.lat}&z=11`],
+    [tr("Peaks on PeakVisor"), `https://peakvisor.com/search?q=${encodeURIComponent(n)}`],
+    [tr("Search: geology of {place}", { place: n }), `https://www.google.com/search?q=${encodeURIComponent("geology of " + n)}`]
   ]);
 }
 
@@ -860,7 +881,7 @@ function sectionsHTML(secs, opts = {}) {
     const h = s.level <= 2 ? `<h3>${esc(s.title)}</h3>` : `<h4>${esc(s.title)}</h4>`;
     const ps = s.text.split(/\n+/).filter(Boolean);
     if (opts.collapse && ps.length > opts.collapse) {
-      return `${h}<div class="prose">${ps.slice(0, opts.collapse).map(p => `<p>${esc(p)}</p>`).join("")}</div><details class="more"><summary>Continue reading (${ps.length - opts.collapse} more paragraphs)</summary><div class="prose">${ps.slice(opts.collapse).map(p => `<p>${esc(p)}</p>`).join("")}</div></details>`;
+      return `${h}<div class="prose">${ps.slice(0, opts.collapse).map(p => `<p>${esc(p)}</p>`).join("")}</div><details class="more"><summary>${tr("Continue reading ({n} more paragraphs)", { n: ps.length - opts.collapse })}</summary><div class="prose">${ps.slice(opts.collapse).map(p => `<p>${esc(p)}</p>`).join("")}</div></details>`;
     }
     return `${h}<div class="prose">${paras(s.text)}</div>`;
   }).join("");
@@ -943,12 +964,12 @@ async function loadWiki(live) {
     const r = await resolveTitles(); if (!live()) return;
     if (!r) {
       S.setQid?.(S.wikidata || null);
-      $("#ov-intro").innerHTML = `<p class="empty">No encyclopaedia article found for ${esc(S.name)}. The map, nature, climate and geology sections below still cover the area.</p>`;
-      $("#ov-facts").innerHTML = `<p class="empty">No facts available.</p>`; $("#hist-wiki").innerHTML = `<p class="empty">No written history found. Try searching for the nearest larger town.</p>`;
+      $("#ov-intro").innerHTML = `<p class="empty">${tr("No encyclopaedia article found for {place}. The map, nature, climate and geology sections below still cover the area.", { place: esc(S.name) })}</p>`;
+      $("#ov-facts").innerHTML = `<p class="empty">${tr("No facts available.")}</p>`; $("#hist-wiki").innerHTML = `<p class="empty">${tr("No written history found. Try searching for the nearest larger town.")}</p>`;
       $("#factbox").innerHTML = factboxHTML({}, null); return;
     }
     // The reader's chosen language when the article exists in it, otherwise whichever exists
-    const pref = store.get("placelore.wikilang", "en");
+    const pref = store.get("placelore.wikilang", UILANG === "af" ? "af" : "en");
     const lang = r[pref] ? pref : r.en ? "en" : "af", other = lang === "en" ? "af" : "en";
     const d = await wp({ action: "query", prop: "extracts|pageimages|pageprops|info", explaintext: 1, exsectionformat: "wiki", titles: r[lang], redirects: 1, piprop: "thumbnail", pithumbsize: 800, ppprop: "wikibase_item" }, lang);
     if (!live()) return;
@@ -959,14 +980,14 @@ async function loadWiki(live) {
     const full = page.extract || "";
     const secs = parseSections(full);
     const intro = secs.find(s => s.title === "Intro");
-    const langBar = r[other] ? `<div class="langbar" role="group" aria-label="Article language"><span>Read in</span>${["en", "af"].map(l => `<button type="button" data-wikilang="${l}" aria-pressed="${l === lang}">${LANG_NAME[l]}</button>`).join("")}</div>` : "";
-    const afNote = lang === "af" ? `<p class="lang-note">From Afrikaans Wikipedia${r.en ? "" : ", as there's no English article"}. <a href="${translateUrl(title, "af")}" target="_blank" rel="noopener">Translate to English ↗</a></p>` : "";
-    $("#ov-intro").innerHTML = `${langBar}${afNote}<div class="prose" lang="${lang}">${paras(intro?.text || "")}</div><p><a href="${wikiUrl(title, lang)}" target="_blank" rel="noopener">Read the full “${esc(title)}” article ↗</a></p><div id="langHint"></div>`;
+    const langBar = r[other] ? `<div class="langbar" role="group" aria-label="${tr("Article language")}"><span>${tr("Read in")}</span>${["en", "af"].map(l => `<button type="button" data-wikilang="${l}" aria-pressed="${l === lang}">${LANG_NAME[l]}</button>`).join("")}</div>` : "";
+    const afNote = lang === "af" ? `<p class="lang-note">${r.en ? tr("From Afrikaans Wikipedia.") : tr("From Afrikaans Wikipedia, as there's no English article.")} <a href="${translateUrl(title, "af")}" target="_blank" rel="noopener">${tr("Translate to English")} ↗</a></p>` : "";
+    $("#ov-intro").innerHTML = `${langBar}${afNote}<div class="prose" lang="${lang}">${paras(intro?.text || "")}</div><p><a href="${wikiUrl(title, lang)}" target="_blank" rel="noopener">${tr("Read the full “{title}” article", { title: esc(title) })} ↗</a></p><div id="langHint"></div>`;
     $("#ov-intro").querySelectorAll("[data-wikilang]").forEach(b => b.addEventListener("click", () => { store.set("placelore.wikilang", b.dataset.wikilang); RETRY.wiki(); }));
     // Point out when the other language's article is much fuller
     if (r[other]) wp({ action: "query", prop: "info", titles: r[other], redirects: 1 }, other).then(o => {
       const len = o.query?.pages?.[0]?.length || 0;
-      if (live() && len > 3000 && len > 1.8 * (page.length || 0)) $("#langHint").innerHTML = `<p class="lang-note">The ${LANG_NAME[other]} article is about ${Math.round(len / Math.max(page.length, 1))} times longer. <button type="button" class="linkish" data-wikilang="${other}">Read it in ${LANG_NAME[other]}</button></p>`;
+      if (live() && len > 3000 && len > 1.8 * (page.length || 0)) $("#langHint").innerHTML = `<p class="lang-note">${tr("The {lang} article is about {n} times longer.", { lang: LANG_NAME[other], n: Math.round(len / Math.max(page.length, 1)) })} <button type="button" class="linkish" data-wikilang="${other}">${tr("Read it in {lang}", { lang: LANG_NAME[other] })}</button></p>`;
       $("#langHint [data-wikilang]")?.addEventListener("click", e => { store.set("placelore.wikilang", other); RETRY.wiki(); });
     }).catch(() => {});
     for (const id of ["#ov-facts", "#ov-name", "#hist-wiki", "#hist-deep", "#geo-wiki", "#climate-wiki", "#nature-wiki", "#farm-wiki", "#people-wiki"]) $(id).lang = lang;
@@ -975,49 +996,49 @@ async function loadWiki(live) {
     wikidataFacts(qid).then(f => {
       if (!live()) return;
       $("#factbox").innerHTML = factboxHTML(f, page.thumbnail?.source, title);
-      if (f.elevation && !$("#placeElev").textContent) $("#placeElev").textContent = `${f.elevation} m above sea level`;
+      if (f.elevation && !$("#placeElev").textContent) $("#placeElev").textContent = tr("{m} m above sea level", { m: f.elevation });
       renderName(secs, full, f);
     }).catch(() => { $("#factbox").innerHTML = factboxHTML({}, page.thumbnail?.source, title); renderName(secs, full, {}); });
 
     const facts = interestingFacts(full);
-    $("#ov-facts").innerHTML = facts.length ? `<ul class="facts">${facts.map(f => `<li>${esc(f)}</li>`).join("")}</ul>` : `<p class="empty">The article has no standout facts flagged. See the nearby sights at the bottom of the page.</p>`;
+    $("#ov-facts").innerHTML = facts.length ? `<ul class="facts">${facts.map(f => `<li>${esc(f)}</li>`).join("")}</ul>` : `<p class="empty">${tr("The article has no standout facts flagged. See the nearby sights at the bottom of the page.")}</p>`;
 
     // History
     const hist = secs.filter(s => inCat(s, "history"));
-    $("#hist-wiki").innerHTML = hist.length ? sectionsHTML(hist, { collapse: 6 }) : `<div class="prose">${paras(intro?.text || "")}</div><p class="empty">The article has no separate history section.</p>`;
+    $("#hist-wiki").innerHTML = hist.length ? sectionsHTML(hist, { collapse: 6 }) : `<div class="prose">${paras(intro?.text || "")}</div><p class="empty">${tr("The article has no separate history section.")}</p>`;
     // A dedicated "History of X" article, when one exists
     wp({ action: "query", prop: "extracts", explaintext: 1, exsectionformat: "wiki", titles: lang === "af" ? `Geskiedenis van ${title}` : `History of ${title}`, redirects: 1 }, lang).then(h => {
       if (!live()) return; const hp = h.query?.pages?.[0];
       if (!hp || hp.missing || !hp.extract || hp.title === title) return;
       const hs = parseSections(hp.extract);
-      $("#hist-deep").innerHTML = `<div class="callout"><div class="eyebrow">In depth</div>There is a whole article on <a href="${wikiUrl(hp.title, lang)}" target="_blank" rel="noopener">${esc(hp.title)}</a>. Expand the chapters below.</div>` +
-        hs.filter(s => s.text).map(s => `<details class="more"><summary>${esc(s.title === "Intro" ? "Introduction" : s.title)}</summary><div class="prose">${paras(s.text)}</div></details>`).join("");
+      $("#hist-deep").innerHTML = `<div class="callout"><div class="eyebrow">${tr("In depth")}</div>${tr("There is a whole article on {link}. Expand the chapters below.", { link: `<a href="${wikiUrl(hp.title, lang)}" target="_blank" rel="noopener">${esc(hp.title)}</a>` })}</div>` +
+        hs.filter(s => s.text).map(s => `<details class="more"><summary>${esc(s.title === "Intro" ? tr("Introduction") : s.title)}</summary><div class="prose">${paras(s.text)}</div></details>`).join("");
     }).catch(() => {});
 
-    const put = (sel, cat, label) => { const ss = secs.filter(s => inCat(s, cat)); if (ss.length) $(sel).innerHTML = `<div class="callout"><div class="eyebrow">${esc(label)}</div>From the encyclopaedia article${lang === "af" ? " (Afrikaans)" : ""}</div>` + sectionsHTML(ss, { collapse: 4 }); };
-    put("#geo-wiki", "geo", "Landscape");
-    put("#climate-wiki", "climate", "Climate in words");
-    put("#nature-wiki", "nature", "Natural environment");
-    put("#farm-wiki", "farm", "Economy and agriculture");
-    put("#people-wiki", "people", "Notable people");
+    const put = (sel, cat, label) => { const ss = secs.filter(s => inCat(s, cat)); if (ss.length) $(sel).innerHTML = `<div class="callout"><div class="eyebrow">${esc(label)}</div>${lang === "af" ? tr("From the encyclopaedia article (Afrikaans)") : tr("From the encyclopaedia article")}</div>` + sectionsHTML(ss, { collapse: 4 }); };
+    put("#geo-wiki", "geo", tr("Landscape"));
+    put("#climate-wiki", "climate", tr("Climate in words"));
+    put("#nature-wiki", "nature", tr("Natural environment"));
+    put("#farm-wiki", "farm", tr("Economy and agriculture"));
+    put("#people-wiki", "people", tr("Notable people"));
   } catch (err) {
     S.setQid?.(S.wikidata || null);
     if (!live()) return;
-    $("#ov-intro").innerHTML = errHTML(`Could not load the encyclopaedia article (${err.message}).`, "wiki");
-    $("#hist-wiki").innerHTML = errHTML("Could not load the history.", "wiki");
+    $("#ov-intro").innerHTML = errHTML(tr("Could not load the encyclopaedia article ({err}).", { err: err.message }), "wiki");
+    $("#hist-wiki").innerHTML = errHTML(tr("Could not load the history."), "wiki");
     $("#ov-facts").innerHTML = ""; $("#factbox").innerHTML = factboxHTML({}, null);
   }
 }
 function factboxHTML(f, img, title) {
   const rows = [
-    f.description && ["What", f.description],
-    f.population && ["Population", f.population.toLocaleString()],
-    f.founded && ["Founded", f.founded],
-    f.elevation && ["Elevation", `${f.elevation.toLocaleString()} m`],
-    f.area && ["Area", `${f.area.toLocaleString(undefined, { maximumFractionDigits: 1 })} km²`],
-    f.nickname && ["Nickname", f.nickname],
-    S.region && ["Region", S.region],
-    ["Coordinates", `${S.lat.toFixed(4)}, ${S.lon.toFixed(4)}`]
+    f.description && [tr("What"), f.description],
+    f.population && [tr("Population"), f.population.toLocaleString()],
+    f.founded && [tr("Founded"), f.founded],
+    f.elevation && [tr("Elevation"), `${f.elevation.toLocaleString()} m`],
+    f.area && [tr("Area"), `${f.area.toLocaleString(undefined, { maximumFractionDigits: 1 })} km²`],
+    f.nickname && [tr("Nickname"), f.nickname],
+    S.region && [tr("Region"), S.region],
+    [tr("Coordinates"), `${S.lat.toFixed(4)}, ${S.lon.toFixed(4)}`]
   ].filter(Boolean);
   return `${img ? `<img src="${esc(img)}" alt="${esc(title || S.name)}">` : ""}<dl>${rows.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join("")}</dl>`;
 }
@@ -1025,7 +1046,7 @@ function renderName(secs, full, f) {
   const o = nameOrigin(secs, full);
   const after = (f.namedAfter || []).map(n => n.wiki ? `<a href="${wikiUrl(n.wiki, n.wikiLang)}" target="_blank" rel="noopener">${esc(n.label)}</a>${n.desc ? ` (${esc(n.desc)})` : ""}` : esc(n.label)).join(", ");
   if (!o && !after) return;
-  $("#ov-name").innerHTML = `<div class="callout"><div class="eyebrow">Where the name comes from</div>${after ? `<p style="margin:0 0 6px">Named after ${after}.</p>` : ""}${o ? `<div class="prose">${paras(o.text.length > 1500 ? o.text.slice(0, 1500) + "…" : o.text)}</div>` : ""}</div>`;
+  $("#ov-name").innerHTML = `<div class="callout"><div class="eyebrow">${tr("Where the name comes from")}</div>${after ? `<p style="margin:0 0 6px">${tr("Named after {who}.", { who: after })}</p>` : ""}${o ? `<div class="prose">${paras(o.text.length > 1500 ? o.text.slice(0, 1500) + "…" : o.text)}</div>` : ""}</div>`;
 }
 
 /* ---------- OpenStreetMap via Overpass ---------- */
@@ -1097,20 +1118,20 @@ way["landuse"~"^(greenhouse_horticulture|plant_nursery)$"]${a};out count;
 way["landuse"="forest"]${a};out count;`;
 
   const linesP = overpass(qLines).then(d => { if (live()) renderLines(d.elements || []); })
-    .catch(err => { if (!live()) return; $("#trails").innerHTML = errHTML(`Trail data did not load (${err.message}). The map servers may be busy.`, "osm"); $("#rivers").innerHTML = errHTML("River data did not load.", "osm"); });
+    .catch(err => { if (!live()) return; $("#trails").innerHTML = errHTML(tr("Trail data did not load ({err}). The map servers may be busy.", { err: err.message }), "osm"); $("#rivers").innerHTML = errHTML(tr("River data did not load."), "osm"); });
   const poiP = overpass(qPoi).then(d => { if (live()) renderPOIs(d.elements || []); })
-    .catch(err => { if (!live()) return; for (const s of ["#camping", "#picnic", "#views", "#farms", "#peaks", "#hist-sites"]) $(s).innerHTML = errHTML(`Map data did not load (${err.message}).`, "osm"); });
+    .catch(err => { if (!live()) return; for (const s of ["#camping", "#picnic", "#views", "#farms", "#peaks", "#hist-sites"]) $(s).innerHTML = errHTML(tr("Map data did not load ({err}).", { err: err.message }), "osm"); });
   await Promise.all([linesP, poiP]);
 }
 
 function itemsList(items, key, max = 12) {
   if (!items.length) return null;
   const l = LAYERS.find(x => x.key === key);
-  const li = it => `<li><span class="ic" style="background:var(${l.color})">${svg(l.icon)}</span><div class="body"><div class="name">${esc(it.name)}</div>${it.sub ? `<div class="sub">${esc(it.sub)}</div>` : ""}<div class="acts"><button type="button" data-focus="${esc(it.id)}">Show on map</button>${(it.links || []).map(([t, u]) => `<a href="${esc(u)}" target="_blank" rel="noopener">${esc(t)}</a>`).join("")}</div></div>${it.right ? `<span class="num">${esc(it.right)}</span>` : ""}</li>`;
+  const li = it => `<li><span class="ic" style="background:var(${l.color})">${svg(l.icon)}</span><div class="body"><div class="name">${esc(it.name)}</div>${it.sub ? `<div class="sub">${esc(it.sub)}</div>` : ""}<div class="acts"><button type="button" data-focus="${esc(it.id)}">${tr("Show on map")}</button>${(it.links || []).map(([t, u]) => `<a href="${esc(u)}" target="_blank" rel="noopener">${esc(t)}</a>`).join("")}</div></div>${it.right ? `<span class="num">${esc(it.right)}</span>` : ""}</li>`;
   const first = items.slice(0, max).map(li).join(""), rest = items.slice(max).map(li).join("");
-  return `<ul class="items">${first}</ul>${rest ? `<details class="more showall"><summary>Show all ${items.length}</summary><ul class="items">${rest}</ul></details>` : ""}`;
+  return `<ul class="items">${first}</ul>${rest ? `<details class="more showall"><summary>${tr("Show all {n}", { n: items.length })}</summary><ul class="items">${rest}</ul></details>` : ""}`;
 }
-const dirLink = c => ["Directions", `https://www.google.com/maps/dir/?api=1&destination=${c.lat},${c.lon}`];
+const dirLink = c => [tr("Directions"), `https://www.google.com/maps/dir/?api=1&destination=${c.lat},${c.lon}`];
 const osmLink = el => ["OSM", `https://www.openstreetmap.org/${el.type}/${el.id}`];
 
 function renderLines(els) {
@@ -1123,16 +1144,16 @@ function renderLines(els) {
       const segs = (el.members || []).filter(m => m.type === "way").flatMap(m => segments(m.geometry));
       if (!segs.length) continue;
       const id = "r" + el.id, len = segLen(segs);
-      const name = t.name || t.ref || "Unnamed walking route";
-      const sub = [t.network && ({ iwn: "International", nwn: "National", rwn: "Regional", lwn: "Local" }[t.network] || t.network) + " route", t.distance && `${t.distance} km total`, t.description, t.operator].filter(Boolean).join(" · ");
-      const line = L.polyline(segs, { color: trailCol, weight: 4, dashArray: "8 6", opacity: .9 }).bindPopup(popupHTML(name, sub || "Marked walking route", segs[0][0][0], segs[0][0][1], [["Route details", `https://hiking.waymarkedtrails.org/#route?id=${el.id}`]])).addTo(layers.trails);
+      const name = t.name || t.ref || tr("Unnamed walking route");
+      const sub = [t.network && tr({ iwn: "International route", nwn: "National route", rwn: "Regional route", lwn: "Local route" }[t.network] || "Walking route"), t.distance && tr("{n} km total", { n: t.distance }), t.description, t.operator].filter(Boolean).join(" · ");
+      const line = L.polyline(segs, { color: trailCol, weight: 4, dashArray: "8 6", opacity: .9 }).bindPopup(popupHTML(name, sub || tr("Marked walking route"), segs[0][0][0], segs[0][0][1], [[tr("Route details"), `https://hiking.waymarkedtrails.org/#route?id=${el.id}`]])).addTo(layers.trails);
       markerIndex[id] = line;
       cand(id, "marked walking route", name, segs[0][0][0], segs[0][0][1], `${km(len)} in the area${sub ? "; " + sub : ""}`);
-      routes.push({ id, name, sub: sub || "Marked walking route", right: km(len) + " here", links: [["Route details", `https://hiking.waymarkedtrails.org/#route?id=${el.id}`]], len });
+      routes.push({ id, name, sub: sub || tr("Marked walking route"), right: tr("{d} here", { d: km(len) }), links: [[tr("Route details"), `https://hiking.waymarkedtrails.org/#route?id=${el.id}`]], len });
     } else if (el.type === "way" && t.highway) {
       const segs = segments(el.geometry); if (!segs.length) continue;
       const len = segLen(segs);
-      L.polyline(segs, { color: trailCol, weight: t.name ? 3 : 2, opacity: t.name ? .85 : .55 }).bindPopup(popupHTML(t.name || "Footpath", [t.highway, t.sac_scale && "difficulty: " + t.sac_scale.replace(/_/g, " "), t.surface].filter(Boolean).join(" · "), segs[0][0][0], segs[0][0][1], [osmLink(el)])).addTo(layers.trails);
+      L.polyline(segs, { color: trailCol, weight: t.name ? 3 : 2, opacity: t.name ? .85 : .55 }).bindPopup(popupHTML(t.name || tr("Footpath"), [tr(t.highway), t.sac_scale && tr("difficulty: {d}", { d: tr(t.sac_scale.replace(/_/g, " ")) }), t.surface && tr(t.surface)].filter(Boolean).join(" · "), segs[0][0][0], segs[0][0][1], [osmLink(el)])).addTo(layers.trails);
       if (t.name) {
         const p = paths.get(t.name) || { segs: [], len: 0, tags: t };
         p.segs.push(...segs); p.len += len; paths.set(t.name, p);
@@ -1142,13 +1163,13 @@ function renderLines(els) {
   const pathItems = [...paths.entries()].map(([name, p], i) => {
     const id = "p" + i; markerIndex[id] = L.polyline(p.segs);
     if (p.len > 300) cand(id, "named footpath", name, p.segs[0][0][0], p.segs[0][0][1], [km(p.len), p.tags.sac_scale && "difficulty " + p.tags.sac_scale.replace(/_/g, " "), p.tags.surface].filter(Boolean).join("; "));
-    return { id, name, sub: [p.tags.highway === "track" ? "track" : p.tags.highway, p.tags.sac_scale && "difficulty: " + p.tags.sac_scale.replace(/_/g, " "), p.tags.surface].filter(Boolean).join(" · "), right: km(p.len), len: p.len };
+    return { id, name, sub: [tr(p.tags.highway), p.tags.sac_scale && tr("difficulty: {d}", { d: tr(p.tags.sac_scale.replace(/_/g, " ")) }), p.tags.surface && tr(p.tags.surface)].filter(Boolean).join(" · "), right: km(p.len), len: p.len };
   }).filter(x => x.len > 150).sort((a, b) => b.len - a.len);
   // markerIndex for path groups needs to be on the map to fitBounds; use bounds only
   const all = [...routes.sort((a, b) => b.len - a.len), ...pathItems];
   $("#c-trails").textContent = all.length ? `${all.length}` : "";
-  $("#trails").innerHTML = (itemsList(all, "trails", 15) || `<p class="empty">No named trails mapped within ${S.radius / 1000} km.</p>`) +
-    (unnamedLen > 500 ? `<p class="sub" style="color:var(--muted);font-size:.9rem;margin-top:8px">Plus ${km(unnamedLen)} of unnamed footpaths shown on the map.</p>` : "");
+  $("#trails").innerHTML = (itemsList(all, "trails", 15) || `<p class="empty">${tr("No named trails mapped within {n} km.", { n: S.radius / 1000 })}</p>`) +
+    (unnamedLen > 500 ? `<p class="sub" style="color:var(--muted);font-size:.9rem;margin-top:8px">${tr("Plus {d} of unnamed footpaths shown on the map.", { d: km(unnamedLen) })}</p>` : "");
 
   // rivers
   const rivers = new Map();
@@ -1188,36 +1209,36 @@ function renderPOIs(els) {
     const dist = haversine(S, c);
     if (dist > S.radius * 1.05) continue; // drop the box corners
     const wl = wikiTagUrl(t.wikipedia);
-    const extras = [osmLink(el), wl && ["Wikipedia", wl], t.website && ["Website", t.website]].filter(Boolean);
+    const extras = [osmLink(el), wl && ["Wikipedia", wl], t.website && [tr("Website"), t.website]].filter(Boolean);
     if (el.type === "relation" && t.waterway === "river") { rels.push(el); continue; }
     if (t.tourism === "camp_site" || t.tourism === "caravan_site" || t.tourism === "alpine_hut" || t.tourism === "wilderness_hut") {
-      const kind = { camp_site: "Camp site", caravan_site: "Caravan park", alpine_hut: "Mountain hut", wilderness_hut: "Wilderness hut" }[t.tourism];
-      const sub = [kind, t.fee === "no" && "free", t.toilets === "yes" && "toilets", t.drinking_water === "yes" && "water", t.power_supply === "yes" && "power", t.tents === "yes" && "tents allowed", t.operator].filter(Boolean).join(" · ");
+      const kind = tr({ camp_site: "Camp site", caravan_site: "Caravan park", alpine_hut: "Mountain hut", wilderness_hut: "Wilderness hut" }[t.tourism]);
+      const sub = [kind, t.fee === "no" && tr("free"), t.toilets === "yes" && tr("toilets"), t.drinking_water === "yes" && tr("water"), t.power_supply === "yes" && tr("power"), t.tents === "yes" && tr("tents allowed"), t.operator].filter(Boolean).join(" · ");
       addPin("camp", id, c.lat, c.lon, popupHTML(name || kind, sub, c.lat, c.lon, extras));
-      camp.push({ id, name: name || `${kind} (unnamed)`, sub, right: km(dist), dist, links: [dirLink(c), ...extras.slice(1)] });
+      camp.push({ id, name: name || tr("{kind} (unnamed)", { kind }), sub, right: km(dist), dist, links: [dirLink(c), ...extras.slice(1)] });
     } else if (t.tourism === "picnic_site" || t.leisure === "picnic_site") {
-      const sub = ["Picnic site", t.bbq === "yes" && "braai / BBQ", t.fireplace === "yes" && "fireplace", t.toilets === "yes" && "toilets", t.covered === "yes" && "covered"].filter(Boolean).join(" · ");
-      addPin("picnic", id, c.lat, c.lon, popupHTML(name || "Picnic site", sub, c.lat, c.lon, extras));
-      picnic.push({ id, name: name || "Picnic site", sub, right: km(dist), dist, links: [dirLink(c)] });
+      const sub = [tr("Picnic site"), t.bbq === "yes" && tr("braai / BBQ"), t.fireplace === "yes" && tr("fireplace"), t.toilets === "yes" && tr("toilets"), t.covered === "yes" && tr("covered")].filter(Boolean).join(" · ");
+      addPin("picnic", id, c.lat, c.lon, popupHTML(name || tr("Picnic site"), sub, c.lat, c.lon, extras));
+      picnic.push({ id, name: name || tr("Picnic site"), sub, right: km(dist), dist, links: [dirLink(c)] });
     } else if (t.tourism === "viewpoint" || t.leisure === "nature_reserve" || t.boundary === "protected_area") {
       if (!name && t.tourism !== "viewpoint") continue;
-      const kind = t.tourism === "viewpoint" ? "Viewpoint" : (t.protection_title || "Nature reserve");
+      const kind = t.tourism === "viewpoint" ? tr("Viewpoint") : (t.protection_title || tr("Nature reserve"));
       addPin("view", id, c.lat, c.lon, popupHTML(name || kind, kind + (t.description ? " · " + t.description : ""), c.lat, c.lon, extras));
       views.push({ id, name: name || kind, sub: kind, right: km(dist), dist, links: [dirLink(c), ...extras.slice(1)] });
     } else if (t.place === "farm" || t.landuse === "farmyard" || t.shop === "farm" || t.craft || t.tourism === "wine_cellar") {
       if (!name && !t.shop) continue;
-      const kind = t.craft ? ({ winery: "Wine estate", brewery: "Brewery", distillery: "Distillery", beekeeper: "Beekeeper" }[t.craft] || t.craft) : t.tourism === "wine_cellar" ? "Wine cellar" : t.shop === "farm" ? "Farm shop" : "Farm";
-      const sub = [kind, t.produce && "produces " + t.produce.replace(/;/g, ", "), t.crop && "crop: " + t.crop.replace(/;/g, ", "), t.opening_hours && "open " + t.opening_hours].filter(Boolean).join(" · ");
+      const kind = tr(t.craft ? ({ winery: "Wine estate", brewery: "Brewery", distillery: "Distillery", beekeeper: "Beekeeper" }[t.craft] || t.craft) : t.tourism === "wine_cellar" ? "Wine cellar" : t.shop === "farm" ? "Farm shop" : "Farm");
+      const sub = [kind, t.produce && tr("produces {x}", { x: t.produce.replace(/;/g, ", ") }), t.crop && tr("crop: {x}", { x: t.crop.replace(/;/g, ", ") }), t.opening_hours && tr("open {x}", { x: t.opening_hours })].filter(Boolean).join(" · ");
       addPin("farm", id, c.lat, c.lon, popupHTML(name || kind, sub, c.lat, c.lon, extras));
       farms.push({ id, name: name || kind, sub, right: km(dist), dist, links: [dirLink(c), ...extras.slice(1)] });
     } else if (t.natural && name) {
       const ele = parseFloat(t.ele) || null;
-      const sub = [t.natural === "volcano" ? "Volcano" : t.natural === "hill" ? "Hill" : "Peak", ele && `${Math.round(ele)} m`, t.prominence && `prominence ${t.prominence} m`].filter(Boolean).join(" · ");
+      const sub = [tr(t.natural === "volcano" ? "Volcano" : t.natural === "hill" ? "Hill" : "Peak"), ele && `${Math.round(ele)} m`, t.prominence && tr("prominence {n} m", { n: t.prominence })].filter(Boolean).join(" · ");
       addPin("peak", id, c.lat, c.lon, popupHTML(name, sub, c.lat, c.lon, extras));
-      peaks.push({ id, name, sub: [sub, km(dist) + " away"].join(" · "), right: ele ? `${Math.round(ele)} m` : "", ele: ele || -1, dist, links: extras.slice(1) });
+      peaks.push({ id, name, sub: [sub, tr("{d} away", { d: km(dist) })].join(" · "), right: ele ? `${Math.round(ele)} m` : "", ele: ele || -1, dist, links: extras.slice(1) });
     } else if (t.historic && name) {
-      const kind = t.historic.replace(/_/g, " ");
-      const sub = [kind.charAt(0).toUpperCase() + kind.slice(1), t.start_date && "from " + t.start_date, t.inscription && `“${t.inscription.slice(0, 120)}”`, t.description].filter(Boolean).join(" · ");
+      const kind = tr(t.historic.replace(/_/g, " "));
+      const sub = [kind.charAt(0).toUpperCase() + kind.slice(1), t.start_date && tr("from {x}", { x: t.start_date }), t.inscription && `“${t.inscription.slice(0, 120)}”`, t.description].filter(Boolean).join(" · ");
       addPin("hist", id, c.lat, c.lon, popupHTML(name, sub, c.lat, c.lon, extras));
       hist.push({ id, name, sub, right: km(dist), dist, links: [dirLink(c), ...extras.slice(1)], wiki: !!wl });
     }
@@ -1226,18 +1247,18 @@ function renderPOIs(els) {
   candFromMarkers("farm or estate", farms); candFromMarkers("peak", peaks); candFromMarkers("historic site", hist);
   const byDist = (a, b) => a.dist - b.dist;
   const put = (sel, cnt, arr, key, emptyMsg, sort = byDist) => { arr.sort(sort); if (cnt) $(cnt).textContent = arr.length || ""; $(sel).innerHTML = itemsList(arr, key) || `<p class="empty">${emptyMsg}</p>`; };
-  put("#camping", "#c-camp", camp, "camp", `No camp sites mapped within ${S.radius / 1000} km. Try a bigger radius.`);
-  put("#picnic", "#c-picnic", picnic, "picnic", "No picnic sites mapped nearby.");
-  put("#views", "#c-view", views, "view", "No viewpoints or reserves mapped nearby.");
-  put("#peaks", "#c-peaks", peaks, "peak", "No named peaks mapped nearby.", (a, b) => b.ele - a.ele);
-  put("#farms", null, farms, "farm", "No farms are mapped by name nearby. Many farms are not on OpenStreetMap; the land-use summary above shows what the land is used for.");
+  put("#camping", "#c-camp", camp, "camp", tr("No camp sites mapped within {n} km. Try a bigger radius.", { n: S.radius / 1000 }));
+  put("#picnic", "#c-picnic", picnic, "picnic", tr("No picnic sites mapped nearby."));
+  put("#views", "#c-view", views, "view", tr("No viewpoints or reserves mapped nearby."));
+  put("#peaks", "#c-peaks", peaks, "peak", tr("No named peaks mapped nearby."), (a, b) => b.ele - a.ele);
+  put("#farms", null, farms, "farm", tr("No farms are mapped by name nearby. Many farms are not on OpenStreetMap; the land-use summary above shows what the land is used for."));
   hist.sort((a, b) => (b.wiki - a.wiki) || a.dist - b.dist);
-  $("#hist-sites").innerHTML = itemsList(hist, "hist", 10) || `<p class="empty">No historic sites mapped nearby.</p>`;
-  if (farms.length) $("#farms").insertAdjacentHTML("afterbegin", `<h3>Farms, estates and farm shops <span class="count">${farms.length}</span></h3>`);
+  $("#hist-sites").innerHTML = itemsList(hist, "hist", 10) || `<p class="empty">${tr("No historic sites mapped nearby.")}</p>`;
+  if (farms.length) $("#farms").insertAdjacentHTML("afterbegin", `<h3>${tr("Farms, estates and farm shops")} <span class="count">${farms.length}</span></h3>`);
   // land use
-  const names = ["vineyard parcels", "orchards", "fields of farmland", "meadows", "greenhouses & nurseries", "forest plots"];
+  const names = ["vineyard parcels", "orchards", "fields of farmland", "meadows", "greenhouses & nurseries", "forest plots"].map(x => tr(x));
   const lu = counts.map((n, i) => n ? `<span class="pill"><b>${n.toLocaleString()}</b> ${names[i]}</span>` : "").join("");
-  if (lu) $("#landuse").innerHTML = `<h3>How the land is used</h3><p class="lede" style="margin-bottom:6px">Mapped land parcels within ${S.radius / 1000} km.</p><div class="landuse">${lu}</div>`;
+  if (lu) $("#landuse").innerHTML = `<h3>${tr("How the land is used")}</h3><p class="lede" style="margin-bottom:6px">${tr("Mapped land parcels within {n} km.", { n: S.radius / 1000 })}</p><div class="landuse">${lu}</div>`;
   RIVER_RELS = rels; mergeRivers();
 }
 
@@ -1289,43 +1310,43 @@ async function riverStory(r) {
   return out;
 }
 function renderRivers(list) {
-  if (!list.length) { $("#rivers").innerHTML = `<p class="empty">No named rivers or streams mapped within ${S.radius / 1000} km.</p>`; return; }
+  if (!list.length) { $("#rivers").innerHTML = `<p class="empty">${tr("No named rivers or streams mapped within {n} km.", { n: S.radius / 1000 })}</p>`; return; }
   const my = token;
   const top = list.slice(0, 10), rest = list.slice(10);
   $("#rivers").innerHTML = top.map((r, i) => {
     const id = "rv" + i; markerIndex[id] = L.polyline(r.segs);
-    return `<div class="river" id="river-${i}"><h4>${esc(r.name)}</h4><div class="sub" style="color:var(--muted);font-size:.9rem">${r.kind === "river" ? "River" : r.kind === "canal" ? "Canal" : "Stream"} · ${km(r.len)} within the area · <button type="button" class="linkish" data-focus="${id}" style="background:none;border:0;padding:0;color:var(--pine);text-decoration:underline;cursor:pointer;font:inherit">Show on map</button></div><div class="origin">${loading("Looking up the name…")}</div></div>`;
-  }).join("") + (rest.length ? `<details class="more showall"><summary>${rest.length} more named streams</summary><p>${rest.map(r => esc(r.name)).join(" · ")}</p></details>` : "");
+    return `<div class="river" id="river-${i}"><h4>${esc(r.name)}</h4><div class="sub" style="color:var(--muted);font-size:.9rem">${tr(r.kind === "river" ? "River" : r.kind === "canal" ? "Canal" : "Stream")} · ${tr("{d} within the area", { d: km(r.len) })} · <button type="button" class="linkish" data-focus="${id}" style="background:none;border:0;padding:0;color:var(--pine);text-decoration:underline;cursor:pointer;font:inherit">${tr("Show on map")}</button></div><div class="origin">${loading(tr("Looking up the name…"))}</div></div>`;
+  }).join("") + (rest.length ? `<details class="more showall"><summary>${tr("{n} more named streams", { n: rest.length })}</summary><p>${rest.map(r => esc(r.name)).join(" · ")}</p></details>` : "");
   top.forEach((r, i) => {
     riverStory(r).then(o => {
       if (my !== token) return;
       const el = document.querySelector(`#river-${i} .origin`); if (!el) return;
       const bits = [];
-      if (o.desc || o.length) bits.push(`<p style="margin:0 0 4px">${esc([o.desc, o.length && `${o.length} km long in total`].filter(Boolean).join(" · "))}</p>`);
-      if (o.namedAfter?.length) bits.push(`<p style="margin:0 0 4px"><b>Named after:</b> ${esc(o.namedAfter.join(", "))}</p>`);
-      if (o.tagEty) bits.push(`<p style="margin:0 0 4px"><b>Name origin:</b> ${esc(o.tagEty)}</p>`);
-      if (o.text) bits.push(`<p style="margin:0 0 4px" lang="${o.textLang}"><b>The name${o.textLang === "af" ? " (Afrikaans Wikipedia)" : ""}:</b> ${esc(o.text.length > 900 ? o.text.slice(0, 900) + "…" : o.text)}</p>`);
+      if (o.desc || o.length) bits.push(`<p style="margin:0 0 4px">${esc([o.desc, o.length && tr("{n} km long in total", { n: o.length })].filter(Boolean).join(" · "))}</p>`);
+      if (o.namedAfter?.length) bits.push(`<p style="margin:0 0 4px"><b>${tr("Named after:")}</b> ${esc(o.namedAfter.join(", "))}</p>`);
+      if (o.tagEty) bits.push(`<p style="margin:0 0 4px"><b>${tr("Name origin:")}</b> ${esc(o.tagEty)}</p>`);
+      if (o.text) bits.push(`<p style="margin:0 0 4px" lang="${o.textLang}"><b>${o.textLang === "af" ? tr("The name (Afrikaans Wikipedia):") : tr("The name:")}</b> ${esc(o.text.length > 900 ? o.text.slice(0, 900) + "…" : o.text)}</p>`);
       else if (o.intro) bits.push(`<p style="margin:0 0 4px">${esc(o.intro)}</p>`);
-      if (!o.text && !o.tagEty && !o.namedAfter?.length) bits.push(`<p class="empty" style="margin:0 0 4px">No recorded origin for this name yet.</p>`);
-      const links = [o.title && [o.lang === "af" ? "Wikipedia (Afrikaans)" : "Wikipedia", wikiUrl(o.title, o.lang)],
-        o.textLang === "af" && o.textTitle && ["Translate to English", translateUrl(o.textTitle, "af")],
-        o.textLang && o.textLang !== o.lang && ["Wikipedia (Afrikaans)", wikiUrl(o.textTitle, "af")], ["Search the name's origin", `https://www.google.com/search?q=${encodeURIComponent(`${r.name} name origin meaning`)}`]];
+      if (!o.text && !o.tagEty && !o.namedAfter?.length) bits.push(`<p class="empty" style="margin:0 0 4px">${tr("No recorded origin for this name yet.")}</p>`);
+      const links = [o.title && [o.lang === "af" ? tr("Wikipedia (Afrikaans)") : "Wikipedia", wikiUrl(o.title, o.lang)],
+        o.textLang === "af" && o.textTitle && [tr("Translate to English"), translateUrl(o.textTitle, "af")],
+        o.textLang && o.textLang !== o.lang && [tr("Wikipedia (Afrikaans)"), wikiUrl(o.textTitle, "af")], [tr("Search the name's origin"), `https://www.google.com/search?q=${encodeURIComponent(`${r.name} name origin meaning`)}`]];
       el.innerHTML = bits.join("") + `<div class="links" style="margin-top:6px">${linkBtns(links)}</div>`;
-    }).catch(() => { const el = document.querySelector(`#river-${i} .origin`); if (el) el.innerHTML = `<p class="empty">Could not look up this name.</p>`; });
+    }).catch(() => { const el = document.querySelector(`#river-${i} .origin`); if (el) el.innerHTML = `<p class="empty">${tr("Could not look up this name.")}</p>`; });
   });
 }
 
 /* ---------- nature (iNaturalist) ---------- */
 const GROUPS = [
-  { key: "birds", label: "Birds", p: { iconic_taxa: "Aves" }, n: 30, sound: true },
-  { key: "mammals", label: "Mammals", p: { iconic_taxa: "Mammalia" }, n: 24, sound: true },
-  { key: "reptiles", label: "Reptiles", p: { iconic_taxa: "Reptilia" }, n: 24 },
-  { key: "frogs", label: "Frogs & toads", p: { iconic_taxa: "Amphibia" }, n: 18, sound: true },
-  { key: "insects", label: "Insects", p: { iconic_taxa: "Insecta", without_taxon_id: 47157 }, n: 24, sound: true },
-  { key: "spiders", label: "Spiders & scorpions", p: { iconic_taxa: "Arachnida" }, n: 18 },
-  { key: "butterflies", label: "Butterflies & moths", p: { taxon_id: 47157 }, n: 24 },
-  { key: "plants", label: "Wildflowers & plants", p: { iconic_taxa: "Plantae" }, n: 30 },
-  { key: "fish", label: "Fish", p: { iconic_taxa: "Actinopterygii" }, n: 18 }
+  { key: "birds", label: tr("Birds"), p: { iconic_taxa: "Aves" }, n: 30, sound: true },
+  { key: "mammals", label: tr("Mammals"), p: { iconic_taxa: "Mammalia" }, n: 24, sound: true },
+  { key: "reptiles", label: tr("Reptiles"), p: { iconic_taxa: "Reptilia" }, n: 24 },
+  { key: "frogs", label: tr("Frogs & toads"), p: { iconic_taxa: "Amphibia" }, n: 18, sound: true },
+  { key: "insects", label: tr("Insects"), p: { iconic_taxa: "Insecta", without_taxon_id: 47157 }, n: 24, sound: true },
+  { key: "spiders", label: tr("Spiders & scorpions"), p: { iconic_taxa: "Arachnida" }, n: 18 },
+  { key: "butterflies", label: tr("Butterflies & moths"), p: { taxon_id: 47157 }, n: 24 },
+  { key: "plants", label: tr("Wildflowers & plants"), p: { iconic_taxa: "Plantae" }, n: 30 },
+  { key: "fish", label: tr("Fish"), p: { iconic_taxa: "Actinopterygii" }, n: 18 }
 ];
 const natureCache = {}, natureLoaded = {};
 async function loadNature(live) {
@@ -1346,19 +1367,19 @@ function fetchGroup(g) {
 }
 async function showGroup(key, live) {
   const g = GROUPS.find(x => x.key === key);
-  $("#nature").innerHTML = loading(`Loading ${g.label.toLowerCase()}…`);
+  $("#nature").innerHTML = loading(tr("Loading {what}…", { what: g.label.toLowerCase() }));
   try {
     const res = await fetchGroup(g); if (!live()) return;
-    if (!res.length) { $("#nature").innerHTML = `<p class="empty">No ${g.label.toLowerCase()} have been recorded here yet. You could be the first: log a sighting on iNaturalist.</p>`; return; }
+    if (!res.length) { $("#nature").innerHTML = `<p class="empty">${tr("No {what} have been recorded here yet. You could be the first: log a sighting on iNaturalist.", { what: g.label.toLowerCase() })}</p>`; return; }
     $("#nature").innerHTML = `<div class="species">${res.map(r => {
       const t = r.taxon, img = t.default_photo?.medium_url || t.default_photo?.square_url;
       const cs = t.conservation_status?.status_name || (t.threatened ? "threatened" : "");
       return `<article class="sp">${img ? `<img src="${esc(img)}" alt="${esc(t.preferred_common_name || t.name)}" loading="lazy">` : `<div style="aspect-ratio:1;background:var(--line)"></div>`}
         <div class="t">${cs ? `<span class="badge">${esc(cs)}</span>` : ""}<span class="cn">${esc(t.preferred_common_name || t.name)}</span><span class="sn">${esc(t.name)}</span>
-        ${g.sound ? `<button type="button" class="hear" data-taxon="${t.id}">Hear the call</button>` : ""}
-        <div class="ft"><span class="num">${r.count} sightings</span><span><a href="https://www.inaturalist.org/taxa/${t.id}" target="_blank" rel="noopener">iNat</a>${t.wikipedia_url ? ` · <a href="${esc(t.wikipedia_url)}" target="_blank" rel="noopener">Wiki</a>` : ""}</span></div></div></article>`;
+        ${g.sound ? `<button type="button" class="hear" data-taxon="${t.id}">${tr("Hear the call")}</button>` : ""}
+        <div class="ft"><span class="num">${tr("{n} sightings", { n: r.count })}</span><span><a href="https://www.inaturalist.org/taxa/${t.id}" target="_blank" rel="noopener">iNat</a>${t.wikipedia_url ? ` · <a href="${esc(t.wikipedia_url)}" target="_blank" rel="noopener">Wiki</a>` : ""}</span></div></div></article>`;
     }).join("")}</div>`;
-  } catch (err) { if (live()) $("#nature").innerHTML = errHTML(`Wildlife data did not load (${err.message}).`, "nature"); }
+  } catch (err) { if (live()) $("#nature").innerHTML = errHTML(tr("Wildlife data did not load ({err}).", { err: err.message }), "nature"); }
 }
 
 /* Real recordings from iNaturalist: near the place first, then the rest of South Africa, then anywhere */
@@ -1381,21 +1402,21 @@ async function findSound(taxonId) {
 }
 function stopSound() {
   if (player) { player.pause(); player = null; }
-  if (playingBtn) { playingBtn.textContent = "Hear the call"; playingBtn.removeAttribute("aria-pressed"); playingBtn = null; }
+  if (playingBtn) { playingBtn.textContent = tr("Hear the call"); playingBtn.removeAttribute("aria-pressed"); playingBtn = null; }
 }
 document.addEventListener("click", async e => {
   const b = e.target.closest(".hear"); if (!b) return;
   if (playingBtn === b) { stopSound(); return; }
   stopSound();
-  b.textContent = "Finding a recording…"; b.disabled = true;
+  b.textContent = tr("Finding a recording…"); b.disabled = true;
   const snd = await findSound(b.dataset.taxon);
   b.disabled = false;
-  if (!snd) { b.textContent = "No recording found"; return; }
+  if (!snd) { b.textContent = tr("No recording found"); return; }
   player = new Audio(snd.url); playingBtn = b;
-  b.textContent = "Stop"; b.setAttribute("aria-pressed", "true");
-  b.title = [snd.where && "Recorded at " + snd.where, snd.by].filter(Boolean).join(" · ");
+  b.textContent = tr("Stop"); b.setAttribute("aria-pressed", "true");
+  b.title = [snd.where && tr("Recorded at {where}", { where: snd.where }), snd.by].filter(Boolean).join(" · ");
   player.addEventListener("ended", stopSound);
-  player.play().catch(() => { stopSound(); b.textContent = "Couldn't play this recording"; });
+  player.play().catch(() => { stopSound(); b.textContent = tr("Couldn't play this recording"); });
 });
 
 /* ---------- climate (Open-Meteo) ---------- */
@@ -1408,15 +1429,15 @@ async function loadWeather(live) {
     if (dd?.time?.length) S.today = `Today's forecast: ${wmo(dd.weather_code[0])}, ${Math.round(dd.temperature_2m_min[0])}–${Math.round(dd.temperature_2m_max[0])}°C, ${dd.precipitation_probability_max[0] ?? "unknown"}% chance of rain. Sunrise ${hm(dd.sunrise[0])}, sunset ${hm(dd.sunset[0])}.`;
     const c = d.current; if (!c) return;
     $("#weatherNow").hidden = false;
-    $("#weatherNow").textContent = `Now: ${Math.round(c.temperature_2m)}°C, ${wmo(c.weather_code)}, wind ${Math.round(c.wind_speed_10m)} km/h`;
-    if (d.elevation != null && !$("#placeElev").textContent) $("#placeElev").textContent = `${Math.round(d.elevation)} m above sea level`;
+    $("#weatherNow").textContent = tr("Now: {t}°C, {w}, wind {v} km/h", { t: Math.round(c.temperature_2m), w: tr(wmo(c.weather_code)), v: Math.round(c.wind_speed_10m) });
+    if (d.elevation != null && !$("#placeElev").textContent) $("#placeElev").textContent = tr("{m} m above sea level", { m: Math.round(d.elevation) });
   } catch {}
 }
 function wmo(c) {
   if (c === 0) return "clear"; if (c <= 2) return "partly cloudy"; if (c === 3) return "overcast"; if (c <= 48) return "fog";
   if (c <= 57) return "drizzle"; if (c <= 67) return "rain"; if (c <= 77) return "snow"; if (c <= 82) return "showers"; if (c <= 86) return "snow showers"; return "thunderstorms";
 }
-const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const MON = Array.from({ length: 12 }, (_, i) => new Intl.DateTimeFormat(LOCALE, { month: "short" }).format(new Date(2021, i, 15)).replace(".", ""));
 async function loadClimate(live) {
   try {
     const d = await getJSON(`https://archive-api.open-meteo.com/v1/archive?${qs({ latitude: S.lat, longitude: S.lon, start_date: "2015-01-01", end_date: "2024-12-31", daily: "temperature_2m_max,temperature_2m_min,precipitation_sum,sunshine_duration", timezone: "auto" })}`, {}, 60000);
@@ -1432,8 +1453,8 @@ async function loadClimate(live) {
     const ny = years.size;
     const M = m.map(o => ({ tx: o.tx / o.n, tn: o.tn / o.n, t: (o.tx + o.tn) / 2 / o.n, p: o.p / ny, sun: o.sun / o.n, rd: o.rainDays / ny }));
     renderClimate(M, d.elevation);
-    if (d.elevation != null && !$("#placeElev").textContent) $("#placeElev").textContent = `${Math.round(d.elevation)} m above sea level`;
-  } catch (err) { if (live()) $("#climate").innerHTML = errHTML(`Climate data did not load (${err.message}).`, "climate"); }
+    if (d.elevation != null && !$("#placeElev").textContent) $("#placeElev").textContent = tr("{m} m above sea level", { m: Math.round(d.elevation) });
+  } catch (err) { if (live()) $("#climate").innerHTML = errHTML(tr("Climate data did not load ({err}).", { err: err.message }), "climate"); }
 }
 function koppen(M, lat) {
   const T = M.map(x => x.t), P = M.map(x => x.p);
@@ -1484,27 +1505,27 @@ function renderClimate(M, elev) {
   const labels = MON.map((m, i) => `<text x="${xC(i)}" y="${H - 8}" text-anchor="middle">${m}</text>`).join("");
   const zero = tMin < 0 ? `<line x1="${L0}" x2="${W - R0}" y1="${yT(0)}" y2="${yT(0)}" stroke="var(--muted)" stroke-dasharray="3 3"/>` : "";
   $("#climate").innerHTML = `
-    <p class="prose" style="margin-top:0">Climate type <span class="koppen">${code}</span> ${esc(KOPPEN[code] || "")} (Köppen classification, computed from the data below).</p>
+    <p class="prose" style="margin-top:0">${tr("Climate type {code} {name} (Köppen classification, computed from the data below).", { code: `<span class="koppen">${code}</span>`, name: esc(tr(KOPPEN[code] || "")) })}</p>
     <div class="stats">
-      <div class="stat"><div class="v">${M[hot].tx.toFixed(0)}°C</div><div class="k">Avg high in ${MON[hot]}, the warmest month</div></div>
-      <div class="stat"><div class="v">${M[cold].tn.toFixed(0)}°C</div><div class="k">Avg low in ${MON[cold]}, the coldest month</div></div>
-      <div class="stat"><div class="v">${Math.round(MAP).toLocaleString()} mm</div><div class="k">Rain per year</div></div>
-      <div class="stat"><div class="v">${MON[wet]}</div><div class="k">Wettest month, ${Math.round(M[wet].p)} mm over ${Math.round(M[wet].rd)} days</div></div>
-      <div class="stat"><div class="v">${MON[dry]}</div><div class="k">Driest month, ${Math.round(M[dry].p)} mm</div></div>
-      ${sunAvg ? `<div class="stat"><div class="v">${sunAvg.toFixed(1)} h</div><div class="k">Sunshine per day on average</div></div>` : ""}
+      <div class="stat"><div class="v">${M[hot].tx.toFixed(0)}°C</div><div class="k">${tr("Avg high in {m}, the warmest month", { m: MON[hot] })}</div></div>
+      <div class="stat"><div class="v">${M[cold].tn.toFixed(0)}°C</div><div class="k">${tr("Avg low in {m}, the coldest month", { m: MON[cold] })}</div></div>
+      <div class="stat"><div class="v">${Math.round(MAP).toLocaleString()} mm</div><div class="k">${tr("Rain per year")}</div></div>
+      <div class="stat"><div class="v">${MON[wet]}</div><div class="k">${tr("Wettest month, {mm} mm over {d} days", { mm: Math.round(M[wet].p), d: Math.round(M[wet].rd) })}</div></div>
+      <div class="stat"><div class="v">${MON[dry]}</div><div class="k">${tr("Driest month, {mm} mm", { mm: Math.round(M[dry].p) })}</div></div>
+      ${sunAvg ? `<div class="stat"><div class="v">${sunAvg.toFixed(1)} h</div><div class="k">${tr("Sunshine per day on average")}</div></div>` : ""}
     </div>
-    <div class="chartbox"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Monthly temperatures and rainfall">${g}${bars}${zero}${line("tx", "var(--trail)")}${line("tn", "var(--river)")}${labels}
+    <div class="chartbox"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${tr("Monthly temperatures and rainfall")}">${g}${bars}${zero}${line("tx", "var(--trail)")}${line("tn", "var(--river)")}${labels}
       <text x="${L0 - 6}" y="10" text-anchor="end">°C</text><text x="${W - R0 + 6}" y="10">mm</text></svg>
-      <div class="legend"><span><span class="swatch" style="background:var(--trail)"></span> Avg daily high</span><span><span class="swatch" style="background:var(--river)"></span> Avg daily low</span><span><span class="swatch" style="background:var(--river);opacity:.35;border-radius:2px"></span> Rainfall per month</span></div>
+      <div class="legend"><span><span class="swatch" style="background:var(--trail)"></span> ${tr("Avg daily high")}</span><span><span class="swatch" style="background:var(--river)"></span> ${tr("Avg daily low")}</span><span><span class="swatch" style="background:var(--river);opacity:.35;border-radius:2px"></span> ${tr("Rainfall per month")}</span></div>
     </div>
-    <p class="links">${linkBtns([["Climate & weather history (Open-Meteo)", `https://open-meteo.com/en/docs/historical-weather-api#latitude=${S.lat}&longitude=${S.lon}`], ["Köppen climate types explained", "https://en.wikipedia.org/wiki/K%C3%B6ppen_climate_classification"]])}</p>`;
+    <p class="links">${linkBtns([[tr("Climate & weather history (Open-Meteo)"), `https://open-meteo.com/en/docs/historical-weather-api#latitude=${S.lat}&longitude=${S.lon}`], [tr("Köppen climate types explained"), "https://en.wikipedia.org/wiki/K%C3%B6ppen_climate_classification"]])}</p>`;
 }
 
 /* ---------- geology (Macrostrat) ---------- */
 function fmtAge(b, t) {
-  const f = x => x >= 1000 ? `${(x / 1000).toFixed(2)} billion` : x >= 1 ? `${Math.round(x)} million` : `${Math.round(x * 1000)} thousand`;
-  if (b == null) return ""; if (t == null || Math.abs(b - t) < .01) return `about ${f(b)} years old`;
-  return `${f(t)} to ${f(b)} years old`;
+  const f = x => x >= 1000 ? tr("{n} billion", { n: (x / 1000).toFixed(2) }) : x >= 1 ? tr("{n} million", { n: Math.round(x) }) : tr("{n} thousand", { n: Math.round(x * 1000) });
+  if (b == null) return ""; if (t == null || Math.abs(b - t) < .01) return tr("about {a} years old", { a: f(b) });
+  return tr("{a} to {b} years old", { a: f(t), b: f(b) });
 }
 async function loadGeology(live) {
   try {
@@ -1521,40 +1542,40 @@ async function loadGeology(live) {
     if (!live()) return;
     const seen = new Set();
     units = units.filter(u => u.name && !seen.has(u.name) && seen.add(u.name)).slice(0, 4);
-    if (!units.length) { $("#geology").innerHTML = `<p class="empty">No geological map covers this exact spot yet. Open the geological map link below to explore the surroundings.</p>`; return; }
+    if (!units.length) { $("#geology").innerHTML = `<p class="empty">${tr("No geological map covers this exact spot yet. Open the geological map link below to explore the surroundings.")}</p>`; return; }
     $("#geology").innerHTML = units.map(u => `<div class="unit"><h4 style="margin:0">${esc(u.name)}</h4>
       <div class="age">${esc([u.age, fmtAge(u.b, u.t)].filter(Boolean).join(" · "))}</div>
-      ${u.lith ? `<p style="margin:6px 0 0"><b>Rock types:</b> ${esc(u.lith)}</p>` : ""}
+      ${u.lith ? `<p style="margin:6px 0 0"><b>${tr("Rock types:")}</b> ${esc(u.lith)}</p>` : ""}
       ${u.descrip ? `<p style="margin:6px 0 0">${esc(u.descrip)}</p>` : ""}
       ${u.comments ? `<p style="margin:6px 0 0;color:var(--muted)">${esc(u.comments)}</p>` : ""}
-      ${u.strat ? `<div class="links" style="margin-top:8px">${linkBtns([["Read about the " + u.strat, `https://${LANG}.wikipedia.org/w/index.php?search=${encodeURIComponent(u.strat)}`]])}</div>` : ""}</div>`).join("");
-  } catch (err) { if (live()) $("#geology").innerHTML = errHTML(`The geological map did not load (${err.message}).`, "geo"); }
+      ${u.strat ? `<div class="links" style="margin-top:8px">${linkBtns([[tr("Read about the {name}", { name: u.strat }), `https://${LANG}.wikipedia.org/w/index.php?search=${encodeURIComponent(u.strat)}`]])}</div>` : ""}</div>`).join("");
+  } catch (err) { if (live()) $("#geology").innerHTML = errHTML(tr("The geological map did not load ({err}).", { err: err.message }), "geo"); }
 }
 
 /* ---------- accommodation, recreation and help (one Overpass query) ---------- */
 const STAY_GROUPS = [
-  { k: "farm", label: "Farm stays", search: "farm stay" },
-  { k: "guest", label: "Guest houses & B&Bs", search: "guest house" },
-  { k: "hotel", label: "Hotels & motels", search: "hotel" },
-  { k: "self", label: "Self-catering & chalets", search: "self catering" },
-  { k: "hostel", label: "Hostels & backpackers", search: "backpackers" }
+  { k: "farm", label: tr("Farm stays"), search: "farm stay" },
+  { k: "guest", label: tr("Guest houses & B&Bs"), search: "guest house" },
+  { k: "hotel", label: tr("Hotels & motels"), search: "hotel" },
+  { k: "self", label: tr("Self-catering & chalets"), search: "self catering" },
+  { k: "hostel", label: tr("Hostels & backpackers"), search: "backpackers" }
 ];
 const FUN_GROUPS = [
-  { k: "food", label: "Restaurants & cafés", search: "restaurants" },
-  { k: "night", label: "Local nightlife", search: "bars pubs" },
-  { k: "kids", label: "Things for kids to do", search: "things to do with kids" },
-  { k: "golf", label: "Golf courses", search: "golf course" },
-  { k: "cinema", label: "Cinemas & theatres", search: "cinema theatre" },
-  { k: "squash", label: "Squash courts", search: "squash courts" },
-  { k: "tennis", label: "Tennis clubs & courts", search: "tennis club" },
-  { k: "4x4", label: "4×4 trails", search: "4x4 trail" },
-  { k: "sport", label: "Other sports & recreation", search: "sports recreation" }
+  { k: "food", label: tr("Restaurants & cafés"), search: "restaurants" },
+  { k: "night", label: tr("Local nightlife"), search: "bars pubs" },
+  { k: "kids", label: tr("Things for kids to do"), search: "things to do with kids" },
+  { k: "golf", label: tr("Golf courses"), search: "golf course" },
+  { k: "cinema", label: tr("Cinemas & theatres"), search: "cinema theatre" },
+  { k: "squash", label: tr("Squash courts"), search: "squash courts" },
+  { k: "tennis", label: tr("Tennis clubs & courts"), search: "tennis club" },
+  { k: "4x4", label: tr("4×4 trails"), search: "4x4 trail" },
+  { k: "sport", label: tr("Other sports & recreation"), search: "sports recreation" }
 ];
 const HELP_GROUPS = [
-  { k: "medical", label: "Hospitals & clinics", search: "hospital" },
-  { k: "police", label: "Police stations", search: "police station" },
-  { k: "pharmacy", label: "Pharmacies", search: "pharmacy" },
-  { k: "fuel", label: "Fuel stations", search: "petrol station" }
+  { k: "medical", label: tr("Hospitals & clinics"), search: "hospital" },
+  { k: "police", label: tr("Police stations"), search: "police station" },
+  { k: "pharmacy", label: tr("Pharmacies"), search: "pharmacy" },
+  { k: "fuel", label: tr("Fuel stations"), search: "petrol station" }
 ];
 // Farm stays only when explicitly tagged, so ordinary farms are never offered as lodging
 function stayKind(t) {
@@ -1581,7 +1602,7 @@ const nice = v => v ? v.replace(/_/g, " ").replace(/;/g, ", ") : "";
 const phoneOf = t => t.phone || t["contact:phone"] || t["contact:mobile"] || "";
 function contactLinks(el, t, c) {
   const ph = phoneOf(t).split(/[;,]/)[0].trim(), web = t.website || t["contact:website"];
-  return [dirLink(c), web && ["Website", web], ph && ["Call " + ph, "tel:" + ph.replace(/[^\d+]/g, "")], osmLink(el)].filter(Boolean);
+  return [dirLink(c), web && [tr("Website"), web], ph && [tr("Call {n}", { n: ph }), "tel:" + ph.replace(/[^\d+]/g, "")], osmLink(el)].filter(Boolean);
 }
 const mapSearch = q => `https://www.google.com/maps/search/${encodeURIComponent(q)}/@${S.lat},${S.lon},12z`;
 
@@ -1609,23 +1630,23 @@ out tags center qt;`;
       const sk = stayKind(t);
       if (sk) {
         const g = STAY_GROUPS.find(x => x.k === sk);
-        const kind = sk === "farm" ? "Farm stay" : { hotel: "Hotel", motel: "Motel", guest_house: t.guest_house === "bed_and_breakfast" ? "B&B" : "Guest house", apartment: "Self-catering apartment", chalet: "Chalet", hostel: "Hostel" }[t.tourism];
-        const sub = [kind, t.stars && `${t.stars}★`, t.rooms && `${t.rooms} rooms`, t.operator, phoneOf(t)].filter(Boolean).join(" · ");
+        const kind = tr(sk === "farm" ? "Farm stay" : { hotel: "Hotel", motel: "Motel", guest_house: t.guest_house === "bed_and_breakfast" ? "B&B" : "Guest house", apartment: "Self-catering apartment", chalet: "Chalet", hostel: "Hostel" }[t.tourism]);
+        const sub = [kind, t.stars && `${t.stars}★`, t.rooms && tr("{n} rooms", { n: t.rooms }), t.operator, phoneOf(t)].filter(Boolean).join(" · ");
         addPin("stay", id, c.lat, c.lon, popupHTML(name || g.label, sub, c.lat, c.lon, contactLinks(el, t, c).slice(1)));
-        (stay[sk] ||= []).push({ id, name: name || `${g.label} (unnamed)`, sub, right: km(dist), dist, links: contactLinks(el, t, c) });
+        (stay[sk] ||= []).push({ id, name: name || tr("{kind} (unnamed)", { kind: g.label }), sub, right: km(dist), dist, links: contactLinks(el, t, c) });
         continue;
       }
       const fk = funKind(t); if (!fk) continue;
       if (fk.startsWith("help:")) {
         const k = fk.slice(5), g = HELP_GROUPS.find(x => x.k === k);
-        const sub = [nice(t.amenity), t.emergency === "yes" && "has emergency department", t.opening_hours && "open " + t.opening_hours, phoneOf(t)].filter(Boolean).join(" · ");
+        const sub = [tr(nice(t.amenity)), t.emergency === "yes" && tr("has emergency department"), t.opening_hours && tr("open {x}", { x: t.opening_hours }), phoneOf(t)].filter(Boolean).join(" · ");
         addPin("help", id, c.lat, c.lon, popupHTML(name || g.label, sub, c.lat, c.lon, contactLinks(el, t, c).slice(1)));
-        (help[k] ||= []).push({ id, name: name || nice(t.amenity), sub, right: km(dist), dist, links: contactLinks(el, t, c) });
+        (help[k] ||= []).push({ id, name: name || tr(nice(t.amenity)), sub, right: km(dist), dist, links: contactLinks(el, t, c) });
         continue;
       }
-      const label = nice(t.amenity || t.leisure || t.tourism || t.route || "venue");
-      const sub = [label.charAt(0).toUpperCase() + label.slice(1), t.cuisine && nice(t.cuisine), t.sport && nice(t.sport), t.opening_hours && "open " + t.opening_hours,
-        (t.access === "private" || t.access === "members" || t.access === "customers") && `access: ${t.access}`, t.fee === "yes" && "fee"].filter(Boolean).join(" · ");
+      const label = tr(nice(t.amenity || t.leisure || t.tourism || t.route || "venue"));
+      const sub = [label.charAt(0).toUpperCase() + label.slice(1), t.cuisine && nice(t.cuisine), t.sport && tr(nice(t.sport)), t.opening_hours && tr("open {x}", { x: t.opening_hours }),
+        (t.access === "private" || t.access === "members" || t.access === "customers") && tr("access: {x}", { x: tr(t.access) }), t.fee === "yes" && tr("fee")].filter(Boolean).join(" · ");
       addPin("fun", id, c.lat, c.lon, popupHTML(name || label, sub, c.lat, c.lon, contactLinks(el, t, c).slice(1)));
       (fun[fk] ||= []).push({ id, name: name || label.charAt(0).toUpperCase() + label.slice(1), sub, right: km(dist), dist, links: contactLinks(el, t, c) });
     }
@@ -1635,22 +1656,22 @@ out tags center qt;`;
       let total = 0;
       const html = groups.map(g => {
         const arr = (data[g.k] || []).sort((a, b) => a.dist - b.dist); total += arr.length;
-        const more = linkBtns([["More on Google Maps", mapSearch(g.search)], key === "stay" && ["Booking.com", `https://www.booking.com/searchresults.html?ss=${encodeURIComponent(S.name)}`]]);
-        const extraNote = g.k === "4x4" && arr.length ? `<p class="callout" style="margin:8px 0">Confirm permission, bookings and track conditions with the operator before you drive. Many 4×4 routes cross private farmland.</p>` : "";
-        return `<div><h3>${esc(g.label)} <span class="count">${arr.length || ""}</span></h3>${itemsList(arr, key, max) || `<p class="empty">None mapped within ${S.radius / 1000} km.</p>`}${extraNote}<div class="links" style="margin-top:6px">${more}</div></div>`;
+        const more = linkBtns([[tr("More on Google Maps"), mapSearch(g.search)], key === "stay" && ["Booking.com", `https://www.booking.com/searchresults.html?ss=${encodeURIComponent(S.name)}`]]);
+        const extraNote = g.k === "4x4" && arr.length ? `<p class="callout" style="margin:8px 0">${tr("Confirm permission, bookings and track conditions with the operator before you drive. Many 4×4 routes cross private farmland.")}</p>` : "";
+        return `<div><h3>${esc(g.label)} <span class="count">${arr.length || ""}</span></h3>${itemsList(arr, key, max) || `<p class="empty">${tr("None mapped within {n} km.", { n: S.radius / 1000 })}</p>`}${extraNote}<div class="links" style="margin-top:6px">${more}</div></div>`;
       }).join("");
       return (total ? "" : `<p class="empty">${emptyAll}</p>`) + `<div class="cols">${html}</div>`;
     };
-    $("#stay").innerHTML = groupHTML(STAY_GROUPS, stay, "stay", 6, "No places to stay are mapped nearby. Try a bigger radius or the search links below.");
-    $("#fun").innerHTML = `${groupHTML(FUN_GROUPS, fun, "fun", 6, "Nothing mapped nearby yet. Try a bigger radius.")}
-      <div class="links">${linkBtns([["Live music & events", `https://www.google.com/search?q=${encodeURIComponent(`live music events ${S.name} this week`)}`], ["What's on", `https://www.google.com/search?q=${encodeURIComponent(`what's on in ${S.name}`)}`]])}</div>`;
-    $("#help-places").innerHTML = `<h3>Nearest help</h3><div class="cols">${HELP_GROUPS.map(g => {
+    $("#stay").innerHTML = groupHTML(STAY_GROUPS, stay, "stay", 6, tr("No places to stay are mapped nearby. Try a bigger radius or the search links below."));
+    $("#fun").innerHTML = `${groupHTML(FUN_GROUPS, fun, "fun", 6, tr("Nothing mapped nearby yet. Try a bigger radius."))}
+      <div class="links">${linkBtns([[tr("Live music & events"), `https://www.google.com/search?q=${encodeURIComponent(`live music events ${S.name} this week`)}`], [tr("What's on"), `https://www.google.com/search?q=${encodeURIComponent(`what's on in ${S.name}`)}`]])}</div>`;
+    $("#help-places").innerHTML = `<h3>${tr("Nearest help")}</h3><div class="cols">${HELP_GROUPS.map(g => {
       const arr = (help[g.k] || []).sort((a, b) => a.dist - b.dist);
-      return `<div><h4>${esc(g.label)}</h4>${itemsList(arr, "help", 3) || `<p class="empty">None mapped within ${S.radius / 1000} km.</p>`}<div class="links" style="margin-top:6px">${linkBtns([["Search nearby", mapSearch(g.search)]])}</div></div>`;
+      return `<div><h4>${esc(g.label)}</h4>${itemsList(arr, "help", 3) || `<p class="empty">${tr("None mapped within {n} km.", { n: S.radius / 1000 })}</p>`}<div class="links" style="margin-top:6px">${linkBtns([[tr("Search nearby"), mapSearch(g.search)]])}</div></div>`;
     }).join("")}</div>`;
   } catch (err) {
     if (!live()) return;
-    for (const s of ["#stay", "#fun"]) $(s).innerHTML = errHTML(`Map data did not load (${err.message}). The map servers may be busy.`, "extra");
+    for (const s of ["#stay", "#fun"]) $(s).innerHTML = errHTML(tr("Map data did not load ({err}). The map servers may be busy.", { err: err.message }), "extra");
     $("#help-places").innerHTML = "";
   }
 }
@@ -1673,22 +1694,22 @@ async function loadHelp(live) {
   let cc = S.country, cname = (S.region || "").split(",").pop().trim();
   if (!cc) {
     try {
-      const r = await getJSON(`${NOM}/reverse?${qs({ lat: S.lat, lon: S.lon, format: "jsonv2", zoom: 3, addressdetails: 1, "accept-language": LANG })}`);
+      const r = await getJSON(`${NOM}/reverse?${qs({ lat: S.lat, lon: S.lon, format: "jsonv2", zoom: 3, addressdetails: 1, "accept-language": `${UILANG},en` })}`);
       cc = r.address?.country_code; cname = r.address?.country || cname; S.country = cc;
     } catch {}
   }
   if (!live()) return;
   const n = S.name, nums = cc && EMERGENCY[cc];
-  const call = ([num, what]) => `<li><span class="ic" style="background:var(--help)">${svg("cross")}</span><div class="body"><div class="name" style="font:700 1.3rem var(--display);user-select:all">${esc(num)}</div><div class="sub">${esc(what)}</div></div><a class="btn primary" href="tel:${esc(num)}">Call</a></li>`;
+  const call = ([num, what]) => `<li><span class="ic" style="background:var(--help)">${svg("cross")}</span><div class="body"><div class="name" style="font:700 1.3rem var(--display);user-select:all">${esc(num)}</div><div class="sub">${esc(tr(what))}</div></div><a class="btn primary" href="tel:${esc(num)}">${tr("Call")}</a></li>`;
   $("#help-numbers").innerHTML = !cc
-    ? `<p class="err">Couldn't work out which country this is, so no emergency numbers are shown. <button class="btn" type="button" data-retry="help">Try again</button></p>`
-    : nums ? `<h3>Emergency numbers${cname ? " in " + esc(cname) : ""}</h3><ul class="items" style="max-width:520px">${nums.map(call).join("")}</ul>`
-    : `<p class="empty">Placelore doesn't have checked emergency numbers for ${esc(cname || cc.toUpperCase())} yet.</p><div class="links">${linkBtns([["Emergency numbers for " + (cname || cc.toUpperCase()), `https://www.google.com/search?q=${encodeURIComponent("emergency phone numbers " + (cname || cc))}`]])}</div>`;
+    ? `<p class="err">${tr("Couldn't work out which country this is, so no emergency numbers are shown.")} <button class="btn" type="button" data-retry="help">${tr("Try again")}</button></p>`
+    : nums ? `<h3>${cname ? tr("Emergency numbers in {country}", { country: esc(cname) }) : tr("Emergency numbers")}</h3><ul class="items" style="max-width:520px">${nums.map(call).join("")}</ul>`
+    : `<p class="empty">${tr("Placelore doesn't have checked emergency numbers for {country} yet.", { country: esc(cname || cc.toUpperCase()) })}</p><div class="links">${linkBtns([[tr("Emergency numbers for {country}", { country: cname || cc.toUpperCase() }), `https://www.google.com/search?q=${encodeURIComponent("emergency phone numbers " + (cname || cc))}`]])}</div>`;
   $("#help-links").innerHTML = linkBtns([
-    ["Police stations nearby", mapSearch("police station")], ["Hospitals nearby", mapSearch("hospital")], ["Fuel nearby", mapSearch("petrol station")],
-    ["Accommodation", `https://www.booking.com/searchresults.html?ss=${encodeURIComponent(n)}`],
+    [tr("Police stations nearby"), mapSearch("police station")], [tr("Hospitals nearby"), mapSearch("hospital")], [tr("Fuel nearby"), mapSearch("petrol station")],
+    [tr("Accommodation"), `https://www.booking.com/searchresults.html?ss=${encodeURIComponent(n)}`],
     cc === "za" && ["Yellow Pages South Africa", "https://www.yellowpages.co.za/"],
-    cc === "za" && ["Check a business registration (CIPC BizPortal)", "https://www.bizportal.gov.za/"]
+    cc === "za" && [tr("Check a business registration (CIPC BizPortal)"), "https://www.bizportal.gov.za/"]
   ]);
 }
 RETRY.help = () => loadHelp(() => true);
@@ -1714,14 +1735,14 @@ async function loadPeople(live) {
     return getJSON(`https://query.wikidata.org/sparql?${qs({ format: "json", query: q })}`, { headers: { Accept: "application/sparql-results+json" } }, ms);
   };
   try {
-    let d, scope = `within ${r} km`;
+    let d, scope = tr("within {n} km", { n: r });
     try {
       d = await sparql(query(`SERVICE wikibase:around { ?place wdt:P625 ?loc . bd:serviceParam wikibase:center "Point(${S.lon} ${S.lat})"^^geo:wktLiteral . bd:serviceParam wikibase:radius "${r}" . }`), 30000);
     } catch (err) {
       // The area search is slow when Wikidata is busy; the town on its own is quick
       const qid = await S.qid; if (!live()) return;
       if (!qid) throw err;
-      d = await sparql(query(`VALUES ?place { wd:${qid} }`), 30000); scope = `in ${S.name} itself`;
+      d = await sparql(query(`VALUES ?place { wd:${qid} }`), 30000); scope = tr("in {place} itself", { place: S.name });
     }
     if (!live()) return;
     const people = new Map();
@@ -1730,12 +1751,12 @@ async function loadPeople(live) {
       cur.rels.add(b.rel.value); people.set(id, cur);
     }
     const list = [...people.values()].filter(p => p.name && !/^Q\d+$/.test(p.name)).sort((a, b) => b.links - a.links);
-    if (!list.length) { $("#people").innerHTML = `<p class="empty">No notable people are recorded as born, died or buried ${scope}.</p>`; return; }
+    if (!list.length) { $("#people").innerHTML = `<p class="empty">${tr("No notable people are recorded as born, died or buried {scope}.", { scope })}</p>`; return; }
     const yr = v => v ? (v.startsWith("-") ? v.slice(1, 5).replace(/^0+/, "") + " BC" : v.slice(0, 4)) : "";
-    const row = p => `<li><span class="ic" style="background:var(--hist)">${svg("book")}</span><div class="body"><div class="name"><a href="${esc(p.url)}" target="_blank" rel="noopener">${esc(p.name)}</a>${p.afOnly ? ` <span class="lang-tag">Afrikaans</span>` : ""} <span class="num">${esc([yr(p.birth), yr(p.death)].filter(Boolean).join("–"))}</span></div>${p.desc ? `<div class="sub">${esc(p.desc)}</div>` : ""}<div class="sub">${esc([...p.rels].map(x => x[0].toUpperCase() + x.slice(1) + " here").join(" · "))}</div></div></li>`;
+    const row = p => `<li><span class="ic" style="background:var(--hist)">${svg("book")}</span><div class="body"><div class="name"><a href="${esc(p.url)}" target="_blank" rel="noopener">${esc(p.name)}</a>${p.afOnly ? ` <span class="lang-tag">${tr("Afrikaans")}</span>` : ""} <span class="num">${esc([yr(p.birth), yr(p.death)].filter(Boolean).join("–"))}</span></div>${p.desc ? `<div class="sub">${esc(p.desc)}</div>` : ""}<div class="sub">${esc([...p.rels].map(x => tr({ born: "Born here", died: "Died here", buried: "Buried here" }[x])).join(" · "))}</div></div></li>`;
     $("#people").innerHTML = `<ul class="items" style="max-width:720px">${list.slice(0, 15).map(row).join("")}</ul>` +
-      (list.length > 15 ? `<details class="more showall"><summary>Show all ${list.length}</summary><ul class="items" style="max-width:720px">${list.slice(15).map(row).join("")}</ul></details>` : "");
-  } catch (err) { if (live()) $("#people").innerHTML = errHTML(`Notable people did not load (${err.message}).`, "people"); }
+      (list.length > 15 ? `<details class="more showall"><summary>${tr("Show all {n}", { n: list.length })}</summary><ul class="items" style="max-width:720px">${list.slice(15).map(row).join("")}</ul></details>` : "");
+  } catch (err) { if (live()) $("#people").innerHTML = errHTML(tr("Notable people did not load ({err}).", { err: err.message }), "people"); }
 }
 
 /* ---------- nearby Wikipedia articles ---------- */
@@ -1749,16 +1770,16 @@ async function loadNearby(live) {
     const seen = new Set(en.map(p => p.pageprops?.wikibase_item).filter(Boolean));
     const pages = [...en, ...af.filter(p => !p.pageprops?.wikibase_item || !seen.has(p.pageprops.wikibase_item))]
       .filter(p => p.title !== S.wikiTitle && p.coordinates?.[0]).map(p => ({ ...p, dist: haversine(S, p.coordinates[0]) })).sort((a, b) => a.dist - b.dist).slice(0, 30);
-    if (!pages.length) { $("#nearby").innerHTML = `<p class="empty">No encyclopaedia entries within 10 km.</p>`; return; }
+    if (!pages.length) { $("#nearby").innerHTML = `<p class="empty">${tr("No encyclopaedia entries within 10 km.")}</p>`; return; }
     pages.forEach(p => cand("w" + p.lang + p.pageid, "sight with an encyclopaedia entry", p.title, p.coordinates[0].lat, p.coordinates[0].lon, p.description || (p.extract || "").slice(0, 140)));
-    pages.forEach(p => { const c = p.coordinates[0]; addPin("wiki", "w" + p.lang + p.pageid, c.lat, c.lon, popupHTML(p.title, p.description || "", c.lat, c.lon, [[p.lang === "af" ? "Wikipedia (Afrikaans)" : "Wikipedia", wikiUrl(p.title, p.lang)]])); });
+    pages.forEach(p => { const c = p.coordinates[0]; addPin("wiki", "w" + p.lang + p.pageid, c.lat, c.lon, popupHTML(p.title, p.description || "", c.lat, c.lon, [[p.lang === "af" ? tr("Wikipedia (Afrikaans)") : "Wikipedia", wikiUrl(p.title, p.lang)]])); });
     $("#nearby").innerHTML = `<div class="cols">${pages.map(p => `<article style="display:flex;gap:12px;align-items:flex-start;min-width:0" lang="${p.lang}">
       ${p.thumbnail ? `<img src="${esc(p.thumbnail.source)}" alt="" loading="lazy" style="width:84px;height:84px;object-fit:cover;border-radius:8px;flex:none">` : ""}
-      <div style="min-width:0"><div style="font:700 1.05rem var(--display)">${esc(p.title)} <span class="num">${km(p.dist)}</span>${p.lang === "af" ? ` <span class="lang-tag">Afrikaans</span>` : ""}</div>
+      <div style="min-width:0"><div style="font:700 1.05rem var(--display)">${esc(p.title)} <span class="num">${km(p.dist)}</span>${p.lang === "af" ? ` <span class="lang-tag">${tr("Afrikaans")}</span>` : ""}</div>
       ${p.description ? `<div style="color:var(--muted);font-size:.88rem">${esc(p.description)}</div>` : ""}
       <p style="margin:4px 0;font-size:.95rem">${esc(p.extract || "")}</p>
-      <div class="acts" style="display:flex;gap:12px;font-size:.88rem;flex-wrap:wrap"><button type="button" data-focus="w${p.lang}${p.pageid}" style="background:none;border:0;padding:0;color:var(--pine);text-decoration:underline;cursor:pointer;font:inherit">Show on map</button><a href="${wikiUrl(p.title, p.lang)}" target="_blank" rel="noopener">Read more ↗</a>${p.lang === "af" ? `<a href="${translateUrl(p.title, "af")}" target="_blank" rel="noopener">Translate ↗</a>` : ""}</div></div></article>`).join("")}</div>`;
-  } catch (err) { if (live()) $("#nearby").innerHTML = errHTML(`Nearby articles did not load (${err.message}).`, "nearby"); }
+      <div class="acts" style="display:flex;gap:12px;font-size:.88rem;flex-wrap:wrap"><button type="button" data-focus="w${p.lang}${p.pageid}" style="background:none;border:0;padding:0;color:var(--pine);text-decoration:underline;cursor:pointer;font:inherit">${tr("Show on map")}</button><a href="${wikiUrl(p.title, p.lang)}" target="_blank" rel="noopener">${tr("Read more")} ↗</a>${p.lang === "af" ? `<a href="${translateUrl(p.title, "af")}" target="_blank" rel="noopener">${tr("Translate")} ↗</a>` : ""}</div></div></article>`).join("")}</div>`;
+  } catch (err) { if (live()) $("#nearby").innerHTML = errHTML(tr("Nearby articles did not load ({err}).", { err: err.message }), "nearby"); }
 }
 
 
@@ -1799,19 +1820,19 @@ function renderPlan(planData) {
     dirs = `https://www.google.com/maps/dir/?api=1&travelmode=${mode}&origin=${ll(pts[0])}&destination=${ll(pts[pts.length - 1])}${mid.length ? "&waypoints=" + encodeURIComponent(mid.map(ll).join("|")) : ""}`;
   }
   $("#planResult").innerHTML = `<article class="plan">
-    <div class="eyebrow">Your day · made ${esc(fmtDate(planData.madeAt))}</div>
+    <div class="eyebrow">${tr("Your day · made {date}", { date: esc(fmtDate(planData.madeAt)) })}</div>
     <h3>${esc(planData.title)}</h3>
     <p class="prose" style="margin:0">${esc(planData.summary)}</p>
     <ol>${stops.map((st, i) => `<li><span class="n">${i + 1}</span>
-      <div class="t">${esc(st.time)}${st.duration_minutes ? ` · about ${st.duration_minutes >= 90 ? (st.duration_minutes / 60).toFixed(st.duration_minutes % 60 ? 1 : 0) + " h" : st.duration_minutes + " min"}` : ""}</div>
+      <div class="t">${esc(st.time)}${st.duration_minutes ? " · " + tr("about {d}", { d: st.duration_minutes >= 90 ? (st.duration_minutes / 60).toFixed(st.duration_minutes % 60 ? 1 : 0) + " h" : st.duration_minutes + " min" }) : ""}</div>
       <div class="h">${esc(st.title)}</div>
-      ${st.place_name ? `<div class="where">${esc(st.place_name)}${st.lat != null ? ` · <button type="button" class="linkish" data-focus="${esc(st.place_id)}">Show on map</button> · <a href="https://www.google.com/maps/dir/?api=1&destination=${st.lat},${st.lon}" target="_blank" rel="noopener">Directions</a>` : ""}</div>` : ""}
+      ${st.place_name ? `<div class="where">${esc(st.place_name)}${st.lat != null ? ` · <button type="button" class="linkish" data-focus="${esc(st.place_id)}">${tr("Show on map")}</button> · <a href="https://www.google.com/maps/dir/?api=1&destination=${st.lat},${st.lon}" target="_blank" rel="noopener">${tr("Directions")}</a>` : ""}</div>` : ""}
       <div class="prose" style="margin-top:4px">${esc(st.activity)}</div>
       ${st.tip ? `<div class="tip">${esc(st.tip)}</div>` : ""}</li>`).join("")}</ol>
     ${planData.notes?.length ? `<ul class="facts">${planData.notes.map(n => `<li>${esc(n)}</li>`).join("")}</ul>` : ""}
-    <div class="links">${dirs ? `<a href="${esc(dirs)}" target="_blank" rel="noopener">Directions for the whole day</a>` : ""}</div>
-    <p class="lang-note" style="margin-top:12px">Suggestions only: check opening times, access and conditions before you go.</p>
-    <div class="plan-actions"><button class="btn" type="button" id="planAgain">Make a different plan</button><button class="btn" type="button" id="planClear">Clear plan</button></div>
+    <div class="links">${dirs ? `<a href="${esc(dirs)}" target="_blank" rel="noopener">${tr("Directions for the whole day")}</a>` : ""}</div>
+    <p class="lang-note" style="margin-top:12px">${tr("Suggestions only: check opening times, access and conditions before you go.")}</p>
+    <div class="plan-actions"><button class="btn" type="button" id="planAgain">${tr("Make a different plan")}</button><button class="btn" type="button" id="planClear">${tr("Clear plan")}</button></div>
   </article>`;
   $("#planAgain").addEventListener("click", () => $("#planForm").requestSubmit());
   $("#planClear").addEventListener("click", () => { try { localStorage.removeItem(planKey()); } catch {} $("#planResult").innerHTML = ""; layers.plan?.clearLayers(); });
@@ -1827,28 +1848,29 @@ function restorePlan() {
 }
 $("#planForm").addEventListener("submit", async e => {
   e.preventDefault();
-  if (!navigator.onLine) { $("#planStatus").textContent = "Planning needs a connection. A plan you made earlier stays here offline."; return; }
+  if (!navigator.onLine) { $("#planStatus").textContent = tr("Planning needs a connection. A plan you made earlier stays here offline."); return; }
   const place = S, prefs = planPrefs(), go = $("#planGo");
-  if (!prefs.interests.length) { $("#planStatus").textContent = "Pick at least one interest."; return; }
+  if (!prefs.interests.length) { $("#planStatus").textContent = tr("Pick at least one interest."); return; }
   go.disabled = true;
-  $("#planStatus").textContent = "Gathering places from the page…";
+  $("#planStatus").textContent = tr("Gathering places from the page…");
   await whenIdle(20000);
   if (place !== S) return;
   const candidates = candidateText();
-  if (!candidates) { $("#planStatus").textContent = "No places have loaded yet. Wait a moment and try again."; go.disabled = false; return; }
-  $("#planStatus").textContent = "Planning your day… this takes about half a minute.";
+  if (!candidates) { $("#planStatus").textContent = tr("No places have loaded yet. Wait a moment and try again."); go.disabled = false; return; }
+  $("#planStatus").textContent = tr("Planning your day… this takes about half a minute.");
   const now = new Date();
   const body = {
     place: `${S.name}${S.region ? ", " + S.region : ""}`,
     about: ($("#ov-intro .prose")?.innerText || "").slice(0, 1500),
     today: `${now.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" })}. ${S.today || $("#weatherNow").textContent || "No forecast available."}`,
     prefs: `Group: ${prefs.who}. Pace: ${prefs.pace}. Getting around: ${prefs.travel}. Interests: ${prefs.interests.join(", ")}. Start at ${prefs.start}.`,
-    candidates
+    candidates,
+    lang: UILANG
   };
   try {
     const r = await fetch("/api/plan", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
     const out = await r.json().catch(() => ({}));
-    if (!r.ok) throw new Error(out.error || "The plan couldn't be made. Try again.");
+    if (!r.ok) throw new Error(out.error || tr("The plan couldn't be made. Try again."));
     if (place !== S) return;
     for (const st of out.stops || []) { const c = st.place_id && CANDS.get(st.place_id); if (c) { st.lat = c.lat; st.lon = c.lon; } }
     const planData = { ...out, travel: prefs.travel, madeAt: Date.now() };
@@ -1857,7 +1879,7 @@ $("#planForm").addEventListener("submit", async e => {
     renderPlan(planData);
     $("#planResult").scrollIntoView({ behavior: "smooth", block: "start" });
   } catch (err) {
-    $("#planStatus").textContent = err.message === "Failed to fetch" ? "No connection to the planner. Check your signal and try again." : err.message;
+    $("#planStatus").textContent = err.message === "Failed to fetch" ? tr("No connection to the planner. Check your signal and try again.") : err.message;
   } finally { go.disabled = false; }
 });
 
@@ -1876,7 +1898,7 @@ const packId = p => `${p.name.toLowerCase()}|${(+p.lat).toFixed(3)},${(+p.lon).t
 // A small index in localStorage lists saved packs without opening IndexedDB
 const packIndex = () => store.get("placelore.packs", []);
 const packMeta = id => packIndex().find(x => x.id === id);
-const fmtDate = t => new Date(t).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+const fmtDate = t => new Date(t).toLocaleDateString(LOCALE, { day: "numeric", month: "short", year: "numeric" });
 const fmtSize = b => b > 1e6 ? `${(b / 1e6).toFixed(1)} MB` : `${Math.max(1, Math.round(b / 1e3))} kB`;
 
 function showPackState() {
@@ -1884,12 +1906,12 @@ function showPackState() {
   const btn = $("#saveOffline");
   btn.disabled = false;
   btn.dataset.saved = !!meta;
-  btn.querySelector("span").textContent = meta ? "Update offline copy" : "Save for offline";
-  $("#saveStatus").textContent = meta ? `Saved ${fmtDate(meta.savedAt)} · ${meta.radius / 1000} km · ${fmtSize(meta.bytes)}` : "";
+  btn.querySelector("span").textContent = meta ? tr("Update offline copy") : tr("Save for offline");
+  $("#saveStatus").textContent = meta ? tr("Saved {date} · {r} km · {size}", { date: fmtDate(meta.savedAt), r: meta.radius / 1000, size: fmtSize(meta.bytes) }) : "";
   const pill = $("#offlinePill");
   pill.hidden = navigator.onLine;
-  pill.textContent = meta ? `Offline · showing your copy from ${fmtDate(meta.savedAt)}` : "Offline · this place isn't saved";
-  if (!navigator.onLine && meta && +$("#radius").value * 1000 !== meta.radius) pill.textContent += ` (saved at ${meta.radius / 1000} km)`;
+  pill.textContent = meta ? tr("Offline · showing your copy from {date}", { date: fmtDate(meta.savedAt) }) : tr("Offline · this place isn't saved");
+  if (!navigator.onLine && meta && +$("#radius").value * 1000 !== meta.radius) pill.textContent += " " + tr("(saved at {r} km)", { r: meta.radius / 1000 });
 }
 window.addEventListener("online", () => S && showPackState());
 window.addEventListener("offline", () => S && showPackState());
@@ -1897,11 +1919,11 @@ window.addEventListener("offline", () => S && showPackState());
 function renderPacks() {
   const list = packIndex();
   $("#packs").hidden = !list.length;
-  $("#packList").innerHTML = list.map(m => `<li><span class="ic" style="background:var(--pine)">${svg("peak")}</span><div class="body"><div class="name"><button type="button" class="del" style="color:var(--ink);text-decoration:none;font-weight:600" data-open="${esc(m.id)}">${esc(m.name)}</button></div><div class="sub">${esc([m.region, `${m.radius / 1000} km`, `saved ${fmtDate(m.savedAt)}`, fmtSize(m.bytes)].filter(Boolean).join(" · "))}</div><div class="acts"><button type="button" data-open="${esc(m.id)}">Open</button><button type="button" data-del="${esc(m.id)}">Delete</button></div></div></li>`).join("");
+  $("#packList").innerHTML = list.map(m => `<li><span class="ic" style="background:var(--pine)">${svg("peak")}</span><div class="body"><div class="name"><button type="button" class="del" style="color:var(--ink);text-decoration:none;font-weight:600" data-open="${esc(m.id)}">${esc(m.name)}</button></div><div class="sub">${esc([m.region, `${m.radius / 1000} km`, tr("saved {date}", { date: fmtDate(m.savedAt) }), fmtSize(m.bytes)].filter(Boolean).join(" · "))}</div><div class="acts"><button type="button" data-open="${esc(m.id)}">${tr("Open")}</button><button type="button" data-del="${esc(m.id)}">${tr("Delete")}</button></div></div></li>`).join("");
   $("#packList").querySelectorAll("[data-open]").forEach(b => b.addEventListener("click", () => openPack(b.dataset.open)));
   $("#packList").querySelectorAll("[data-del]").forEach(b => b.addEventListener("click", async () => {
     const m = packMeta(b.dataset.del); if (!m) return;
-    if (b.dataset.confirm !== "1") { b.dataset.confirm = "1"; b.textContent = `Delete ${m.name}?`; return; }
+    if (b.dataset.confirm !== "1") { b.dataset.confirm = "1"; b.textContent = tr("Delete {name}?", { name: m.name }); return; }
     try { await packs.del(m.id); } catch {}
     store.set("placelore.packs", packIndex().filter(x => x.id !== m.id)); renderPacks();
   }));
@@ -1930,16 +1952,16 @@ function tileUrls() {
 async function fetchAll(urls, label) {
   let done = 0;
   const queue = [...urls];
-  const worker = async () => { for (let u; (u = queue.shift());) { try { await fetch(u, { mode: "no-cors" }); } catch {} done++; if (done % 5 === 0 || done === urls.length) $("#saveStatus").textContent = `${label} ${done} of ${urls.length}…`; } };
+  const worker = async () => { for (let u; (u = queue.shift());) { try { await fetch(u, { mode: "no-cors" }); } catch {} done++; if (done % 5 === 0 || done === urls.length) $("#saveStatus").textContent = tr("{what} {done} of {total}…", { what: label, done, total: urls.length }); } };
   await Promise.all([1, 2, 3, 4].map(worker));
 }
 
 $("#saveOffline").addEventListener("click", async () => {
-  if (!navigator.onLine) { $("#saveStatus").textContent = "Connect to the internet to save this place."; return; }
+  if (!navigator.onLine) { $("#saveStatus").textContent = tr("Connect to the internet to save this place."); return; }
   const place = S, btn = $("#saveOffline");
   btn.disabled = true;
   try {
-    $("#saveStatus").textContent = "Waiting for every section to finish loading…";
+    $("#saveStatus").textContent = tr("Waiting for every section to finish loading…");
     await Promise.allSettled(Object.values(natureCache));
     await whenIdle(90000);
     if (place !== S) return;
@@ -1952,16 +1974,16 @@ $("#saveOffline").addEventListener("click", async () => {
     ACTIVE_PACK = Promise.resolve({ responses });
     // Map tiles and photos go into the service worker's caches
     if ("serviceWorker" in navigator && navigator.serviceWorker.controller) {
-      await fetchAll(tileUrls(), "Saving map tiles");
+      await fetchAll(tileUrls(), tr("Saving map tiles"));
       const photos = new Set([...document.querySelectorAll("#app img")].map(i => i.src).filter(u => u.startsWith("https://")));
       for (const res of await Promise.all(Object.values(natureCache).map(p => p.catch(() => []))))
         for (const r of res) { const u = r.taxon?.default_photo?.medium_url; if (u) photos.add(u); }
-      await fetchAll([...photos], "Saving photos");
+      await fetchAll([...photos], tr("Saving photos"));
     }
     if (place === S) showPackState();
-    if (!navigator.serviceWorker?.controller) $("#saveStatus").textContent += " · The map and photos need one reload of the app before they can be saved too.";
+    if (!navigator.serviceWorker?.controller) $("#saveStatus").textContent += " · " + tr("The map and photos need one reload of the app before they can be saved too.");
   } catch (err) {
-    $("#saveStatus").textContent = `Couldn't save: ${err.message}. Your phone may be out of storage, or private browsing may block saving.`;
+    $("#saveStatus").textContent = tr("Couldn't save: {err}. Your phone may be out of storage, or private browsing may block saving.", { err: err.message });
     btn.disabled = false;
   }
 });
@@ -1970,20 +1992,20 @@ if ("serviceWorker" in navigator && location.protocol.startsWith("http")) naviga
 
 /* ---------- choose which sections to show ---------- */
 const SECTIONS = [
-  { id: "s-overview", label: "Overview" },
-  { id: "s-plan", label: "Plan a day", layers: ["plan"] },
-  { id: "s-stay", label: "Accommodation & farm stays", layers: ["stay"] },
-  { id: "s-map", label: "Map" },
-  { id: "s-history", label: "History", layers: ["hist"] },
-  { id: "s-outdoors", label: "Trails, camping & picnic spots", layers: ["trails", "camp", "picnic", "view"] },
-  { id: "s-nature", label: "Wildlife & birds" },
-  { id: "s-climate", label: "Climate" },
-  { id: "s-geology", label: "Rivers, mountains & geology", layers: ["river", "peak"] },
-  { id: "s-farms", label: "Farms", layers: ["farm"] },
-  { id: "s-people", label: "Famous people" },
-  { id: "s-nearby", label: "Nearby sights", layers: ["wiki"] },
-  { id: "s-help", label: "Emergency & help", layers: ["help"] },
-  { id: "s-fun", label: "Food, fun & recreation", layers: ["fun"] }
+  { id: "s-overview", label: tr("Overview") },
+  { id: "s-plan", label: tr("Plan a day"), layers: ["plan"] },
+  { id: "s-stay", label: tr("Accommodation & farm stays"), layers: ["stay"] },
+  { id: "s-map", label: tr("Map") },
+  { id: "s-history", label: tr("History"), layers: ["hist"] },
+  { id: "s-outdoors", label: tr("Trails, camping & picnic spots"), layers: ["trails", "camp", "picnic", "view"] },
+  { id: "s-nature", label: tr("Wildlife & birds") },
+  { id: "s-climate", label: tr("Climate") },
+  { id: "s-geology", label: tr("Rivers, mountains & geology"), layers: ["river", "peak"] },
+  { id: "s-farms", label: tr("Farms"), layers: ["farm"] },
+  { id: "s-people", label: tr("Famous people") },
+  { id: "s-nearby", label: tr("Nearby sights"), layers: ["wiki"] },
+  { id: "s-help", label: tr("Emergency & help"), layers: ["help"] },
+  { id: "s-fun", label: tr("Food, fun & recreation"), layers: ["fun"] }
 ];
 let hiddenSections = new Set(store.get("placelore.hidden", []));
 function setLayer(key, on) {
@@ -2001,10 +2023,10 @@ function applySections() {
   }
   if (!hiddenSections.has("s-map") && map) setTimeout(() => map.invalidateSize(), 50);
   const n = hiddenSections.size;
-  $("#prefsBtn").lastChild.textContent = n ? `Choose sections (${n} hidden)` : "Choose sections";
+  $("#prefsBtn").lastChild.textContent = n ? tr("Choose sections ({n} hidden)", { n }) : tr("Choose sections");
   let note = $("#hiddenNote");
   if (n === SECTIONS.length) {
-    if (!note) $("main.wrap").insertAdjacentHTML("afterbegin", `<p class="hidden-note" id="hiddenNote">All sections are hidden. Tap <b>Choose sections</b> to pick some.</p>`);
+    if (!note) $("main.wrap").insertAdjacentHTML("afterbegin", `<p class="hidden-note" id="hiddenNote">${tr("All sections are hidden. Tap <b>Choose sections</b> to pick some.")}</p>`);
   } else if (note) note.remove();
 }
 function openPrefs() {
@@ -2048,7 +2070,7 @@ const chatStoreKey = () => "placelore.chat." + (S ? S.name.toLowerCase() : "");
 function chatSwitch() {
   if (chatAbort) chatAbort.abort();
   chatKey = chatStoreKey(); chatMsgs = store.get(chatKey, []);
-  $("#chatTitle").textContent = `Ask about ${S.name}`;
+  $("#chatTitle").textContent = tr("Ask about {place}", { place: S.name });
   renderChat();
 }
 function fmtReply(text) {
@@ -2057,8 +2079,8 @@ function fmtReply(text) {
 function renderChat() {
   const log = $("#chatLog");
   if (!chatMsgs.length) {
-    const ideas = [`What's the story of ${S.name} in a nutshell?`, "Where can we walk this afternoon?", "Which birds should we look out for?", "Where can we stay on a farm?", "Is there something fun for kids?"];
-    log.innerHTML = `<div class="msg note">${navigator.onLine ? "" : "You're offline. The assistant needs a connection, but everything saved on this page still works.<br><br>"}Ask me anything about ${esc(S.name)}. I answer from the information on this page, and tell you when it doesn't cover something.</div><div class="hint">${ideas.map(q => `<button type="button">${esc(q)}</button>`).join("")}</div>`;
+    const ideas = [tr("What's the story of {place} in a nutshell?", { place: S.name }), tr("Where can we walk this afternoon?"), tr("Which birds should we look out for?"), tr("Where can we stay on a farm?"), tr("Is there something fun for kids?")];
+    log.innerHTML = `<div class="msg note">${navigator.onLine ? "" : tr("You're offline. The assistant needs a connection, but everything saved on this page still works.") + "<br><br>"}${tr("Ask me anything about {place}. I answer from the information on this page, and tell you when it doesn't cover something.", { place: esc(S.name) })}</div><div class="hint">${ideas.map(q => `<button type="button">${esc(q)}</button>`).join("")}</div>`;
     log.querySelectorAll(".hint button").forEach(b => b.addEventListener("click", () => sendChat(b.textContent)));
     return;
   }
@@ -2070,23 +2092,23 @@ async function sendChat(text) {
   chatBusy = true; $("#chatSend").disabled = true; $("#chatInput").value = "";
   chatMsgs.push({ role: "user", content: text }, { role: "assistant", content: "" });
   renderChat();
-  const bubble = $("#chatLog").lastElementChild; bubble.textContent = "Thinking…";
+  const bubble = $("#chatLog").lastElementChild; bubble.textContent = tr("Thinking…");
   const key = chatKey, reply = chatMsgs[chatMsgs.length - 1];
   chatAbort = new AbortController();
   try {
     const r = await fetch("/api/chat", { method: "POST", headers: { "Content-Type": "application/json" }, signal: chatAbort.signal,
-      body: JSON.stringify({ place: S.name, context: placeContext(), messages: chatMsgs.slice(0, -1) }) });
-    if (!r.ok) { let msg = "The assistant couldn't answer."; try { msg = (await r.json()).error || msg; } catch {} throw new Error(msg); }
+      body: JSON.stringify({ place: S.name, lang: UILANG, context: placeContext(), messages: chatMsgs.slice(0, -1) }) });
+    if (!r.ok) { let msg = tr("The assistant couldn't answer."); try { msg = (await r.json()).error || msg; } catch {} throw new Error(msg); }
     const reader = r.body.getReader(), dec = new TextDecoder();
     for (;;) {
       const { done, value } = await reader.read(); if (done) break;
       reply.content += dec.decode(value, { stream: true });
       if (key === chatKey) { bubble.innerHTML = fmtReply(reply.content); $("#chatLog").scrollTop = $("#chatLog").scrollHeight; }
     }
-    if (!reply.content.trim()) throw new Error("No answer came back. Try again.");
+    if (!reply.content.trim()) throw new Error(tr("No answer came back. Try again."));
   } catch (err) {
     if (err.name === "AbortError") { chatMsgs.splice(-2); }
-    else { chatMsgs.pop(); chatMsgs.pop(); if (key === chatKey) { renderChat(); $("#chatLog").insertAdjacentHTML("beforeend", `<div class="msg note">${esc(err.message === "Failed to fetch" ? "No connection to the assistant. Check your signal and try again." : err.message)}</div>`); $("#chatInput").value = text; } }
+    else { chatMsgs.pop(); chatMsgs.pop(); if (key === chatKey) { renderChat(); $("#chatLog").insertAdjacentHTML("beforeend", `<div class="msg note">${esc(err.message === "Failed to fetch" ? tr("No connection to the assistant. Check your signal and try again.") : err.message)}</div>`); $("#chatInput").value = text; } }
   } finally {
     if (key === chatKey) store.set(key, chatMsgs.slice(-40));
     chatBusy = false; $("#chatSend").disabled = false; chatAbort = null;
@@ -2106,14 +2128,32 @@ if (SR) {
   $("#chatMic").hidden = false;
   $("#chatMic").addEventListener("click", () => {
     if (rec) return stopMic();
-    rec = new SR(); rec.lang = navigator.language || "en-ZA"; rec.interimResults = true; rec.continuous = false;
+    rec = new SR(); rec.lang = { af: "af-ZA", zu: "zu-ZA" }[UILANG] || (navigator.language || "en-ZA"); rec.interimResults = true; rec.continuous = false;
     const before = $("#chatInput").value ? $("#chatInput").value.trim() + " " : "";
     rec.onresult = e => { $("#chatInput").value = before + [...e.results].map(r => r[0].transcript).join(""); };
-    rec.onerror = e => { stopMic(); if (e.error === "not-allowed") $("#chatLog").insertAdjacentHTML("beforeend", `<div class="msg note">Microphone access was blocked. Allow it in your browser settings to speak your questions.</div>`); };
+    rec.onerror = e => { stopMic(); if (e.error === "not-allowed") $("#chatLog").insertAdjacentHTML("beforeend", `<div class="msg note">${tr("Microphone access was blocked. Allow it in your browser settings to speak your questions.")}</div>`); };
     rec.onend = () => { rec = null; $("#chatMic").removeAttribute("aria-pressed"); };
     rec.start(); $("#chatMic").setAttribute("aria-pressed", "true");
   });
 }
+
+
+/* ---------- interface language ---------- */
+function translatePage() {
+  const d = window.I18N?.[UILANG]; if (UILANG === "en" || !d) return;
+  const norm = x => x.replace(/\s+/g, " ").trim();
+  document.querySelectorAll("[data-t-html]").forEach(el => { const k = norm(el.innerHTML); if (d[k]) el.innerHTML = d[k]; });
+  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
+    acceptNode: n => n.parentElement?.closest("script,style,[data-t-html],#uilang") ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT
+  });
+  const nodes = []; while (walker.nextNode()) nodes.push(walker.currentNode);
+  for (const n of nodes) { const k = norm(n.nodeValue); if (k && d[k]) n.nodeValue = n.nodeValue.replace(/\S(?:[\s\S]*\S)?/, d[k]); }
+  for (const a of ["placeholder", "aria-label", "title"]) document.querySelectorAll(`[${a}]`).forEach(el => { if (el.closest("#uilang")) return; const v = el.getAttribute(a); if (d[v]) el.setAttribute(a, d[v]); });
+}
+translatePage();
+document.querySelectorAll("[data-example]").forEach(b => { b.textContent = tr("Try {place}", { place: b.dataset.example }); });
+$("#uilang").value = UILANG;
+$("#uilang").addEventListener("change", e => { store.set("placelore.uilang", e.target.value); location.reload(); });
 
 /* ---------- header height for sticky nav ---------- */
 const setHdr = () => document.documentElement.style.setProperty("--hdr", $("#hdr").offsetHeight + "px");
