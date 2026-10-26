@@ -440,7 +440,8 @@ const LANG = "en";
 const WP = `https://${LANG}.wikipedia.org/w/api.php`;
 async function getJSON(url, opts = {}, ms = 30000) {
   const c = new AbortController(); const t = setTimeout(() => c.abort(), ms);
-  try { const r = await fetch(url, { ...opts, signal: c.signal }); if (!r.ok) throw new Error(`${r.status} ${r.statusText}`); return await r.json(); }
+  try { const r = await fetch(url, { ...opts, signal: c.signal }); if (!r.ok) throw new Error(r.status === 429 ? "the server is busy" : `${r.status} ${r.statusText}`); return await r.json(); }
+  catch (e) { throw e.name === "AbortError" ? new Error("the server took too long to answer") : e.message === "Failed to fetch" ? new Error("no connection to the server") : e; }
   finally { clearTimeout(t); }
 }
 const wp = params => getJSON(`${WP}?${qs({ format: "json", formatversion: 2, origin: "*", ...params })}`);
@@ -636,6 +637,7 @@ function renderRecent() {
 const RETRY = {};
 function loadPlace(p) {
   S = { ...p, radius: +$("#radius").value * 1000 };
+  S.qid = new Promise(res => { S.setQid = res; setTimeout(() => res(p.wikidata || null), 45000); });
   const my = ++token;
   stopSound();
   const live = () => my === token;
@@ -802,6 +804,7 @@ async function loadWiki(live) {
   try {
     const r = await resolveTitle(); if (!live()) return;
     if (!r) {
+      S.setQid?.(S.wikidata || null);
       $("#ov-intro").innerHTML = `<p class="empty">No encyclopaedia article found for ${esc(S.name)}. The map, nature, climate and geology sections below still cover the area.</p>`;
       $("#ov-facts").innerHTML = `<p class="empty">No facts available.</p>`; $("#hist-wiki").innerHTML = `<p class="empty">No written history found. Try searching for the nearest larger town.</p>`;
       $("#factbox").innerHTML = factboxHTML({}, null); return;
@@ -810,6 +813,7 @@ async function loadWiki(live) {
     if (!live()) return;
     const page = d.query?.pages?.[0]; if (!page || page.missing) throw new Error("Article missing");
     const title = page.title, qid = r.qid || page.pageprops?.wikibase_item;
+    S.setQid?.(qid);
     S.wikiTitle = title; setLinks(title);
     const full = page.extract || "";
     const secs = parseSections(full);
@@ -846,6 +850,7 @@ async function loadWiki(live) {
     put("#farm-wiki", "farm", "Economy and agriculture");
     put("#people-wiki", "people", "Notable people");
   } catch (err) {
+    S.setQid?.(S.wikidata || null);
     if (!live()) return;
     $("#ov-intro").innerHTML = errHTML(`Could not load the encyclopaedia article (${err.message}).`, "wiki");
     $("#hist-wiki").innerHTML = errHTML("Could not load the history.", "wiki");
@@ -874,13 +879,21 @@ function renderName(secs, full, f) {
 
 /* ---------- OpenStreetMap via Overpass ---------- */
 const OVERPASS = ["https://overpass-api.de/api/interpreter", "https://overpass.kumi.systems/api/interpreter", "https://overpass.private.coffee/api/interpreter"];
+// Each query starts on a different mirror and falls over to the others; at most two run at once
+let overpassCalls = 0, overpassActive = 0; const overpassWaiting = [];
 async function overpass(q) {
-  let last;
-  for (const url of OVERPASS) {
-    try { return await getJSON(url, { method: "POST", body: "data=" + encodeURIComponent(q), headers: { "Content-Type": "application/x-www-form-urlencoded" } }, 30000); }
-    catch (e) { last = e; }
-  }
-  throw last;
+  if (overpassActive >= 2) await new Promise(r => overpassWaiting.push(r));
+  overpassActive++;
+  const start = overpassCalls++;
+  try {
+    let last;
+    for (let k = 0; k < OVERPASS.length; k++) {
+      const url = OVERPASS[(start + k) % OVERPASS.length];
+      try { return await getJSON(url, { method: "POST", body: "data=" + encodeURIComponent(q), headers: { "Content-Type": "application/x-www-form-urlencoded" } }, 50000); }
+      catch (e) { last = e; }
+    }
+    throw last;
+  } finally { overpassActive--; overpassWaiting.shift()?.(); }
 }
 function bbox(lat, lon, r) {
   const dLat = r / 111320, dLon = r / (111320 * Math.cos(lat * Math.PI / 180));
@@ -895,9 +908,9 @@ const segLen = segs => segs.reduce((t, s) => t + s.slice(1).reduce((a, p, i) => 
 const center = el => el.center ? el.center : (el.lat != null ? { lat: el.lat, lon: el.lon } : null);
 
 async function loadOSM(live) {
-  const R = S.radius, Rt = Math.min(R, 12000), a = `(around:${R},${S.lat},${S.lon})`, at = `(around:${Rt},${S.lat},${S.lon})`;
+  const R = S.radius, Rt = Math.min(R, 12000), a = `(${bbox(S.lat, S.lon, R)})`, at = `(${bbox(S.lat, S.lon, Rt)})`; // boxes are much quicker for Overpass than radius searches
   const bb = bbox(S.lat, S.lon, R * 1.05);
-  const qLines = `[out:json][timeout:25];
+  const qLines = `[out:json][timeout:45];
 (
   relation["route"~"^(hiking|foot|walking)$"]${a};
   way["highway"~"^(path|bridleway)$"]${at};
@@ -905,7 +918,7 @@ async function loadOSM(live) {
   way["waterway"~"^(river|stream|canal)$"]["name"]${a};
 );
 out tags geom(${bb}) qt;`;
-  const qPoi = `[out:json][timeout:25];
+  const qPoi = `[out:json][timeout:45];
 (
   nwr["tourism"~"^(camp_site|caravan_site|picnic_site|viewpoint|wine_cellar|alpine_hut|wilderness_hut)$"]${a};
   nwr["leisure"="picnic_site"]${a};
@@ -1015,6 +1028,7 @@ function renderPOIs(els) {
     const t = el.tags || {}, c = center(el); if (!c) continue;
     const id = el.type[0] + el.id, name = t.name || t["name:en"];
     const dist = haversine(S, c);
+    if (dist > S.radius * 1.05) continue; // drop the box corners
     const wl = wikiTagUrl(t.wikipedia);
     const extras = [osmLink(el), wl && ["Wikipedia", wl], t.website && ["Website", t.website]].filter(Boolean);
     if (el.type === "relation" && t.waterway === "river") { rels.push(el); continue; }
@@ -1404,8 +1418,8 @@ function contactLinks(el, t, c) {
 const mapSearch = q => `https://www.google.com/maps/search/${encodeURIComponent(q)}/@${S.lat},${S.lon},12z`;
 
 async function loadExtra(live) {
-  const a = `(around:${S.radius},${S.lat},${S.lon})`;
-  const q = `[out:json][timeout:25];
+  const a = `(${bbox(S.lat, S.lon, S.radius)})`;
+  const q = `[out:json][timeout:45];
 (
   nwr["tourism"~"^(hotel|motel|hostel|guest_house|apartment|chalet|farmstay)$"]${a};
   nwr["accommodation"="farmstay"]${a};
@@ -1423,6 +1437,7 @@ out tags center qt;`;
     for (const el of d.elements || []) {
       const t = el.tags || {}, c = center(el); if (!c) continue;
       const id = "x" + el.type[0] + el.id, dist = haversine(S, c), name = t.name || t["name:en"];
+      if (dist > S.radius * 1.05) continue;
       const sk = stayKind(t);
       if (sk) {
         const g = STAY_GROUPS.find(x => x.k === sk);
@@ -1510,9 +1525,9 @@ RETRY.help = () => loadHelp(() => true);
 
 /* ---------- famous people (Wikidata) ---------- */
 async function loadPeople(live) {
-  const r = Math.min(S.radius / 1000, 15);
-  const q = `SELECT ?p ?pLabel ?pDescription ?birth ?death ?rel ?article ?links WHERE {
-  SERVICE wikibase:around { ?place wdt:P625 ?loc . bd:serviceParam wikibase:center "Point(${S.lon} ${S.lat})"^^geo:wktLiteral . bd:serviceParam wikibase:radius "${r}" . }
+  const r = Math.min(S.radius / 1000, 8);
+  const query = placeClause => `SELECT ?p ?pLabel ?pDescription ?birth ?death ?rel ?article ?links WHERE {
+  ${placeClause}
   { ?p wdt:P19 ?place . BIND("born" AS ?rel) } UNION { ?p wdt:P20 ?place . BIND("died" AS ?rel) } UNION { ?p wdt:P119 ?place . BIND("buried" AS ?rel) }
   ?p wdt:P31 wd:Q5 .
   OPTIONAL { ?p wdt:P569 ?birth } OPTIONAL { ?p wdt:P570 ?death }
@@ -1520,8 +1535,17 @@ async function loadPeople(live) {
   ?p wikibase:sitelinks ?links .
   SERVICE wikibase:label { bd:serviceParam wikibase:language "${LANG}" . }
 } ORDER BY DESC(?links) LIMIT 120`;
+  const sparql = (q, ms) => getJSON(`https://query.wikidata.org/sparql?${qs({ format: "json", query: q })}`, { headers: { Accept: "application/sparql-results+json" } }, ms);
   try {
-    const d = await getJSON(`https://query.wikidata.org/sparql?${qs({ format: "json", query: q })}`, { headers: { Accept: "application/sparql-results+json" } }, 40000);
+    let d, scope = `within ${r} km`;
+    try {
+      d = await sparql(query(`SERVICE wikibase:around { ?place wdt:P625 ?loc . bd:serviceParam wikibase:center "Point(${S.lon} ${S.lat})"^^geo:wktLiteral . bd:serviceParam wikibase:radius "${r}" . }`), 30000);
+    } catch (err) {
+      // The area search is slow when Wikidata is busy; the town on its own is quick
+      const qid = await S.qid; if (!live()) return;
+      if (!qid) throw err;
+      d = await sparql(query(`VALUES ?place { wd:${qid} }`), 30000); scope = `in ${S.name} itself`;
+    }
     if (!live()) return;
     const people = new Map();
     for (const b of d.results?.bindings || []) {
@@ -1529,7 +1553,7 @@ async function loadPeople(live) {
       cur.rels.add(b.rel.value); people.set(id, cur);
     }
     const list = [...people.values()].filter(p => p.name && !/^Q\d+$/.test(p.name)).sort((a, b) => b.links - a.links);
-    if (!list.length) { $("#people").innerHTML = `<p class="empty">No notable people are recorded as born, died or buried within ${r} km.</p>`; return; }
+    if (!list.length) { $("#people").innerHTML = `<p class="empty">No notable people are recorded as born, died or buried ${scope}.</p>`; return; }
     const yr = v => v ? (v.startsWith("-") ? v.slice(1, 5).replace(/^0+/, "") + " BC" : v.slice(0, 4)) : "";
     const row = p => `<li><span class="ic" style="background:var(--hist)">${svg("book")}</span><div class="body"><div class="name"><a href="${esc(p.url)}" target="_blank" rel="noopener">${esc(p.name)}</a> <span class="num">${esc([yr(p.birth), yr(p.death)].filter(Boolean).join("–"))}</span></div>${p.desc ? `<div class="sub">${esc(p.desc)}</div>` : ""}<div class="sub">${esc([...p.rels].map(x => x[0].toUpperCase() + x.slice(1) + " here").join(" · "))}</div></div></li>`;
     $("#people").innerHTML = `<ul class="items" style="max-width:720px">${list.slice(0, 15).map(row).join("")}</ul>` +
