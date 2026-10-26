@@ -188,6 +188,18 @@ ul.items .acts button{background:none;border:0;padding:0;color:var(--pine);font:
 .recent .row button{font-size:.9rem}
 footer{padding-block:24px 40px;color:var(--muted);font-size:.85rem}
 
+/* section chooser */
+.chip-btn{flex:none;display:inline-flex;align-items:center;gap:6px;font:600 .9rem var(--body);padding:6px 12px;border-radius:999px;border:1px solid var(--pine);background:var(--pine-soft);color:var(--ink);cursor:pointer}
+.chip-btn svg{width:16px;height:16px;fill:currentColor}
+.prefs-backdrop{position:fixed;inset:0;z-index:1400;background:rgb(0 0 0 / .45);display:grid;place-items:center;padding:16px}
+.prefs{background:var(--surface);color:var(--ink);border-radius:16px;width:min(520px,100%);max-height:calc(100dvh - 32px);overflow-y:auto;padding:20px;box-shadow:0 16px 48px rgb(0 0 0 / .3)}
+.prefs h2{margin-bottom:4px}
+.prefs-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;margin:12px 0 16px}
+.prefs-list label{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;cursor:pointer;min-height:44px}
+.prefs-list label:has(input:checked){border-color:var(--pine);background:var(--pine-soft)}
+.prefs-list input{accent-color:var(--pine);width:18px;height:18px;margin:0}
+.prefs-actions{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap}
+.hidden-note{color:var(--muted);font-size:.9rem;padding-block:16px}
 /* place assistant */
 .ask-fab{position:fixed;right:max(16px,calc(env(safe-area-inset-right,0px) + 12px));bottom:calc(env(safe-area-inset-bottom,0px) + 16px);z-index:1200;box-shadow:0 6px 20px rgb(0 0 0 / .25);padding:14px 18px;border-radius:999px}
 .chat{position:fixed;z-index:1300;right:max(12px,env(safe-area-inset-right,0px));bottom:calc(env(safe-area-inset-bottom,0px) + 12px);width:min(420px,calc(100vw - 24px));height:min(620px,calc(100dvh - 90px));background:var(--surface);border:1px solid var(--line);border-radius:16px;box-shadow:0 16px 48px rgb(0 0 0 / .3);display:flex;flex-direction:column;overflow:hidden}
@@ -260,6 +272,7 @@ footer{padding-block:24px 40px;color:var(--muted);font-size:.85rem}
   </div>
 
   <nav class="chapters" aria-label="Chapters"><div class="wrap">
+    <button type="button" class="chip-btn" id="prefsBtn" aria-haspopup="dialog"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h11v2H3zm14 0h4v2h-4V3h-2v6h2zM3 11h4v2H3zm6-2h2v6H9v-2H7v-2h2zm4 2h8v2h-8zM3 17h11v2H3zm14-2h2v6h-2v-2h-2v-2h2z"/></svg>Choose sections</button>
     <a href="#s-overview">Overview</a>
     <a href="#s-stay">Stay</a>
     <a href="#s-map">Map</a>
@@ -395,6 +408,17 @@ footer{padding-block:24px 40px;color:var(--muted);font-size:.85rem}
 </div>
 
 
+<div class="prefs-backdrop" id="prefs" hidden>
+  <div class="prefs" role="dialog" aria-modal="true" aria-labelledby="prefsTitle">
+    <h2 id="prefsTitle">Choose your sections</h2>
+    <p class="lede">Pick what you want to see for every place. Your choice is saved on this device. Hidden sections also take their pins off the map.</p>
+    <div class="prefs-list" id="prefsList"></div>
+    <div class="prefs-actions">
+      <button type="button" class="btn" id="prefsAll">Show all</button>
+      <button type="button" class="btn primary" id="prefsDone">Done</button>
+    </div>
+  </div>
+</div>
 <button class="btn primary ask-fab" id="askFab" type="button" hidden>Ask about this place</button>
 <div class="chat" id="chat" role="dialog" aria-label="Ask about this place" hidden>
   <header><b id="chatTitle">Ask about this place</b><button type="button" id="chatClear" title="Start a new conversation">New chat</button><button type="button" id="chatClose" aria-label="Close">✕</button></header>
@@ -642,6 +666,7 @@ function loadPlace(p) {
   map.setView([p.lat, p.lon], zoom);
   L.circle([p.lat, p.lon], { radius: S.radius, color: css("--pine"), weight: 1, fill: false, dashArray: "4 6", interactive: false }).addTo(centerLayer);
   if (p.gps) L.marker([p.lat, p.lon], { icon: L.divIcon({ className: "", html: '<div class="me-dot"></div>', iconSize: [16, 16] }) }).bindPopup("You are here").addTo(centerLayer);
+  applySections();
   setTimeout(() => map.invalidateSize(), 50);
   window.scrollTo({ top: 0 });
 
@@ -1529,6 +1554,60 @@ async function loadNearby(live) {
   } catch (err) { if (live()) $("#nearby").innerHTML = errHTML(`Nearby articles did not load (${err.message}).`, "nearby"); }
 }
 
+
+
+/* ---------- choose which sections to show ---------- */
+const SECTIONS = [
+  { id: "s-overview", label: "Overview" },
+  { id: "s-stay", label: "Accommodation & farm stays", layers: ["stay"] },
+  { id: "s-map", label: "Map" },
+  { id: "s-history", label: "History", layers: ["hist"] },
+  { id: "s-outdoors", label: "Trails, camping & picnic spots", layers: ["trails", "camp", "picnic", "view"] },
+  { id: "s-nature", label: "Wildlife & birds" },
+  { id: "s-climate", label: "Climate" },
+  { id: "s-geology", label: "Rivers, mountains & geology", layers: ["river", "peak"] },
+  { id: "s-farms", label: "Farms", layers: ["farm"] },
+  { id: "s-people", label: "Famous people" },
+  { id: "s-nearby", label: "Nearby sights", layers: ["wiki"] },
+  { id: "s-help", label: "Emergency & help", layers: ["help"] },
+  { id: "s-fun", label: "Food, fun & recreation", layers: ["fun"] }
+];
+let hiddenSections = new Set(store.get("placelore.hidden", []));
+function setLayer(key, on) {
+  const box = document.getElementById("lt-" + key);
+  if (box) box.closest("label").hidden = !on;
+  if (!map || !layers[key]) return;
+  if (on && box?.checked) layers[key].addTo(map); else if (!on) map.removeLayer(layers[key]);
+}
+function applySections() {
+  for (const sec of SECTIONS) {
+    const show = !hiddenSections.has(sec.id);
+    document.getElementById(sec.id).hidden = !show;
+    const chip = document.querySelector(`nav.chapters a[href="#${sec.id}"]`); if (chip) chip.hidden = !show;
+    for (const k of sec.layers || []) setLayer(k, show);
+  }
+  if (!hiddenSections.has("s-map") && map) setTimeout(() => map.invalidateSize(), 50);
+  const n = hiddenSections.size;
+  $("#prefsBtn").lastChild.textContent = n ? `Choose sections (${n} hidden)` : "Choose sections";
+  let note = $("#hiddenNote");
+  if (n === SECTIONS.length) {
+    if (!note) $("main.wrap").insertAdjacentHTML("afterbegin", `<p class="hidden-note" id="hiddenNote">All sections are hidden. Tap <b>Choose sections</b> to pick some.</p>`);
+  } else if (note) note.remove();
+}
+function openPrefs() {
+  $("#prefsList").innerHTML = SECTIONS.map(sec => `<label><input type="checkbox" value="${sec.id}" ${hiddenSections.has(sec.id) ? "" : "checked"}>${esc(sec.label)}</label>`).join("");
+  $("#prefsList").querySelectorAll("input").forEach(i => i.addEventListener("change", () => {
+    i.checked ? hiddenSections.delete(i.value) : hiddenSections.add(i.value);
+    store.set("placelore.hidden", [...hiddenSections]); applySections();
+  }));
+  $("#prefs").hidden = false; $("#prefsDone").focus();
+}
+const closePrefs = () => { $("#prefs").hidden = true; $("#prefsBtn").focus(); };
+$("#prefsBtn").addEventListener("click", openPrefs);
+$("#prefsDone").addEventListener("click", closePrefs);
+$("#prefsAll").addEventListener("click", () => { hiddenSections.clear(); store.set("placelore.hidden", []); openPrefs(); applySections(); });
+$("#prefs").addEventListener("click", e => { if (e.target.id === "prefs") closePrefs(); });
+document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("#prefs").hidden) closePrefs(); });
 
 /* ---------- the place assistant ---------- */
 // The assistant answers from what this page has already loaded, sent as plain text.
