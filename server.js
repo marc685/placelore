@@ -1,4 +1,4 @@
-// Placelore server: serves the app, streams answers for "Ask about this place",
+// Placelore server: serves the app, streams answers for "Ask about this place", plans days out,
 // and relays OpenStreetMap (Overpass) and Wikidata queries with retries and a cache,
 // because those public servers often reject or time out busy browsers.
 import http from "node:http";
@@ -117,6 +117,74 @@ async function chat(req, res) {
 }
 
 
+
+/* ---------- Plan a day ---------- */
+const PLAN_SYSTEM = `You plan a day out for travellers in a place they are visiting, using the Placelore app's data.
+
+Build the day from the candidate places listed in the request. Every stop at a specific place must be one of the candidates: copy its id exactly into place_id and its name into place_name. For stops that aren't at a listed place (setting off, a drive, back at your stay), leave place_id empty.
+
+Make a day that works on the ground:
+- Order stops to avoid backtracking, using the distances given. On foot, keep consecutive stops close (about 3 km at most) and the total walking sensible for the group.
+- Fit the day between the start time and sunset, with time to travel between stops. Include lunch: a restaurant or café, or a picnic site, farm stall or wine estate.
+- Match the chosen interests, pace and group. With children, choose shorter walks and add something for kids where possible.
+- If rain is likely or it's very hot, favour shade, indoor and shorter outdoor options, and say why.
+- Never state opening hours, prices or booking rules. Where they matter (wine tastings, restaurants, guided farm visits), say "check opening times" or "book ahead" in the tip.
+
+Use 4 to 7 stops, times as 24-hour "HH:MM". Write plainly and briefly; tips are one practical sentence. Notes hold 1 to 3 short practical reminders for the whole day (water, sun, permits, fuel).`;
+
+const PLAN_SCHEMA = {
+  type: "object", additionalProperties: false, required: ["title", "summary", "stops", "notes"],
+  properties: {
+    title: { type: "string" },
+    summary: { type: "string" },
+    stops: { type: "array", items: { type: "object", additionalProperties: false,
+      required: ["time", "title", "place_id", "place_name", "activity", "tip", "duration_minutes"],
+      properties: { time: { type: "string" }, title: { type: "string" }, place_id: { type: "string" }, place_name: { type: "string" },
+        activity: { type: "string" }, tip: { type: "string" }, duration_minutes: { type: "integer" } } } },
+    notes: { type: "array", items: { type: "string" } }
+  }
+};
+
+async function plan(req, res) {
+  const ip = (req.headers["x-forwarded-for"] || req.socket.remoteAddress || "").split(",")[0].trim();
+  const send = (code, obj) => { res.writeHead(code, { "Content-Type": "application/json" }); res.end(JSON.stringify(obj)); };
+  if (rateLimited(ip)) return send(429, { error: "You're asking quickly. Wait a few minutes and try again." });
+  const anthropic = await getClient();
+  if (!anthropic) return send(503, { error: "Planning isn't set up yet: the server has no ANTHROPIC_API_KEY setting." });
+  let body;
+  try { body = JSON.parse(await readBody(req)); } catch { return send(400, { error: "The request couldn't be read. Try again." }); }
+  const candidates = String(body.candidates || "").slice(0, 40_000);
+  if (!candidates.trim()) return send(400, { error: "There are no places loaded yet to plan with. Wait for the page to finish loading." });
+  const ids = new Set(candidates.split("\n").map(l => l.split(" | ")[0].trim()).filter(Boolean));
+  const request = [
+    `Place: ${String(body.place || "").slice(0, 200)}`,
+    `About the place: ${String(body.about || "").slice(0, 2000)}`,
+    `Day: ${String(body.today || "").slice(0, 600)}`,
+    `Who and how: ${String(body.prefs || "").slice(0, 600)}`,
+    `Candidate places (id | kind | name | distance from the centre | details):\n${candidates}`
+  ].join("\n\n");
+  try {
+    const msg = await anthropic.beta.messages.create({
+      model: MODEL,
+      max_tokens: 8000,
+      output_config: { effort: "medium", format: { type: "json_schema", schema: PLAN_SCHEMA } },
+      betas: ["server-side-fallback-2026-07-01"],
+      fallbacks: "default",
+      system: PLAN_SYSTEM,
+      messages: [{ role: "user", content: request }]
+    });
+    if (msg.stop_reason === "refusal") return send(422, { error: "A plan couldn't be made for this place. Try different interests." });
+    const text = msg.content.filter(b => b.type === "text").map(b => b.text).join("");
+    const out = JSON.parse(text);
+    for (const st of out.stops || []) if (st.place_id && !ids.has(st.place_id)) st.place_id = ""; // only ids we sent
+    send(200, out);
+  } catch (err) {
+    console.error("plan error", err?.status, err?.message);
+    const busy = err?.status === 429 || err?.status === 529 || err?.status >= 500;
+    send(busy ? 503 : 500, { error: busy ? "The planner is busy right now. Try again in a minute." : "Something went wrong making the plan. Try again." });
+  }
+}
+
 /* ---------- Overpass and Wikidata relay ---------- */
 const OVERPASS = ["https://overpass-api.de/api/interpreter", "https://overpass.kumi.systems/api/interpreter", "https://overpass.private.coffee/api/interpreter"];
 const UA = "Placelore/1.0 (https://github.com/marc685/placelore)";
@@ -192,6 +260,10 @@ http.createServer((req, res) => {
   if (req.url.startsWith("/api/chat")) {
     if (req.method !== "POST") { res.writeHead(405); return res.end(); }
     return chat(req, res).catch(err => { console.error(err); if (!res.headersSent) res.writeHead(500); res.end(); });
+  }
+  if (req.url.startsWith("/api/plan")) {
+    if (req.method !== "POST") { res.writeHead(405); return res.end(); }
+    return plan(req, res).catch(err => { console.error(err); if (!res.headersSent) res.writeHead(500); res.end(); });
   }
   if (req.url.startsWith("/api/overpass")) return relay(req, res, "overpass").catch(err => { console.error(err); if (!res.headersSent) res.writeHead(500); res.end(); });
   if (req.url.startsWith("/api/sparql")) return relay(req, res, "sparql").catch(err => { console.error(err); if (!res.headersSent) res.writeHead(500); res.end(); });

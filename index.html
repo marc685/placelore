@@ -198,6 +198,25 @@ footer{padding-block:24px 40px;color:var(--muted);font-size:.85rem}
 .lang-note{color:var(--muted);font-size:.92rem;margin:0 0 10px}
 .linkish{background:none;border:0;padding:0;color:var(--pine);text-decoration:underline;cursor:pointer;font:inherit}
 .lang-tag{font:500 .7rem var(--mono);text-transform:uppercase;letter-spacing:.05em;padding:1px 6px;border-radius:4px;background:var(--pine-soft);color:var(--ink);vertical-align:middle}
+/* plan a day */
+.plan-form{display:flex;flex-direction:column;gap:12px;max-width:760px}
+.plan-form fieldset{border:0;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.plan-form legend{font:500 .75rem var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:6px;width:100%}
+.plan-form label{display:inline-flex;align-items:center;gap:6px;padding:7px 12px;border:1px solid var(--line);border-radius:999px;background:var(--surface);cursor:pointer;font-size:.92rem;min-height:40px}
+.plan-form label:has(input:checked){border-color:var(--pine);background:var(--pine-soft)}
+.plan-form input[type=radio],.plan-form input[type=checkbox]{accent-color:var(--pine);margin:0}
+.plan-form .time input{font:inherit;border:0;background:none;color:var(--ink)}
+.plan-actions{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.plan{margin-top:20px;max-width:760px}
+.plan h3{margin-top:0}
+.plan ol{list-style:none;margin:16px 0;padding:0;border-left:2px solid var(--line);margin-left:14px}
+.plan li{position:relative;padding:0 0 18px 26px}
+.plan li .n{position:absolute;left:-15px;top:0;width:28px;height:28px;border-radius:50%;background:var(--ochre);color:var(--surface);display:grid;place-items:center;font:700 .85rem var(--mono)}
+.plan li .t{font:500 .85rem var(--mono);color:var(--muted);font-variant-numeric:tabular-nums}
+.plan li .h{font:700 1.08rem var(--display);margin:2px 0}
+.plan li .where{font-size:.9rem;color:var(--muted)}
+.plan li .tip{font-size:.9rem;margin-top:4px;padding:6px 10px;border-radius:8px;background:var(--pine-soft)}
+.plan-num{display:grid;place-items:center;width:28px;height:28px;border-radius:50%;background:var(--ochre);color:#fff;font:700 13px/1 var(--mono);border:2px solid #fff;box-shadow:0 1px 4px rgb(0 0 0 / .45)}
 /* offline packs */
 .save-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:12px}
 .save-row .btn svg{width:18px;height:18px}
@@ -298,6 +317,7 @@ footer{padding-block:24px 40px;color:var(--muted);font-size:.85rem}
   <nav class="chapters" aria-label="Chapters"><div class="wrap">
     <button type="button" class="chip-btn" id="prefsBtn" aria-haspopup="dialog"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h11v2H3zm14 0h4v2h-4V3h-2v6h2zM3 11h4v2H3zm6-2h2v6H9v-2H7v-2h2zm4 2h8v2h-8zM3 17h11v2H3zm14-2h2v6h-2v-2h-2v-2h2z"/></svg>Choose sections</button>
     <a href="#s-overview">Overview</a>
+    <a href="#s-plan">Plan a day</a>
     <a href="#s-stay">Stay</a>
     <a href="#s-map">Map</a>
     <a href="#s-history">History</a>
@@ -325,6 +345,40 @@ footer{padding-block:24px 40px;color:var(--muted);font-size:.85rem}
         <aside class="factbox" id="factbox"><dl><dt>Loading</dt><dd>…</dd></dl></aside>
       </div>
       <div class="links" id="ov-links"></div>
+    </section>
+
+    <section id="s-plan">
+      <h2>Plan a day here</h2>
+      <p class="lede">Tell the planner who's coming and what you enjoy. It builds a day from the real places on this page, fitted to today's weather and daylight.</p>
+      <form id="planForm" class="plan-form">
+        <fieldset><legend>Who's coming</legend>
+          <label><input type="radio" name="who" value="adults" checked>Adults</label>
+          <label><input type="radio" name="who" value="family with young children">Family with kids</label>
+          <label><input type="radio" name="who" value="older travellers who prefer easy walking">Easy walking</label>
+        </fieldset>
+        <fieldset><legend>Pace</legend>
+          <label><input type="radio" name="pace" value="relaxed" checked>Relaxed</label>
+          <label><input type="radio" name="pace" value="full and active">Full day</label>
+        </fieldset>
+        <fieldset><legend>Getting around</legend>
+          <label><input type="radio" name="travel" value="driving" checked>Car</label>
+          <label><input type="radio" name="travel" value="walking">On foot</label>
+        </fieldset>
+        <fieldset><legend>Interests</legend>
+          <label><input type="checkbox" name="int" value="walks and hikes" checked>Walks</label>
+          <label><input type="checkbox" name="int" value="history and heritage" checked>History</label>
+          <label><input type="checkbox" name="int" value="nature and birds">Nature &amp; birds</label>
+          <label><input type="checkbox" name="int" value="food, wine and farm stalls" checked>Food &amp; farm stalls</label>
+          <label><input type="checkbox" name="int" value="picnics">Picnics</label>
+          <label><input type="checkbox" name="int" value="things for children">Kids' fun</label>
+          <label><input type="checkbox" name="int" value="views and photography">Views</label>
+        </fieldset>
+        <fieldset><legend>Start</legend>
+          <label class="time"><input type="time" id="planStart" value="09:00" aria-label="Start time"></label>
+        </fieldset>
+        <div class="plan-actions"><button class="btn primary" type="submit" id="planGo">Plan my day</button><span class="save-status" id="planStatus"></span></div>
+      </form>
+      <div id="planResult"></div>
     </section>
 
     <section id="s-stay">
@@ -533,6 +587,15 @@ const svg = k => `<svg viewBox="0 0 24 24" aria-hidden="true">${ICON[k]}</svg>`;
 let S = null;       // current place
 let token = 0;      // guards against stale responses
 let map, layers = {}, markerIndex = {}, centerLayer, currentBase;
+// Real places the day planner may choose from, keyed by the same ids as the map markers
+let CANDS = new Map();
+function cand(id, kind, name, lat, lon, info = "") {
+  if (!name || lat == null) return;
+  CANDS.set(id, { id, kind, name, lat, lon, info: String(info).slice(0, 160), dist: haversine(S, { lat, lon }) });
+}
+function candFromMarkers(kind, items) {
+  for (const it of items) { const ll = markerIndex[it.id]?.getLatLng?.(); if (ll) cand(it.id, kind, it.name, ll.lat, ll.lng, it.sub); }
+}
 
 const LAYERS = [
   { key: "trails", label: "Trails", color: "--trail", icon: "boot" },
@@ -546,7 +609,8 @@ const LAYERS = [
   { key: "wiki", label: "Encyclopaedia", color: "--wiki", icon: "book" },
   { key: "stay", label: "Stays", color: "--stay", icon: "bed" },
   { key: "fun", label: "Recreation", color: "--fun", icon: "ball" },
-  { key: "help", label: "Help & fuel", color: "--help", icon: "cross" }
+  { key: "help", label: "Help & fuel", color: "--help", icon: "cross" },
+  { key: "plan", label: "Day plan", color: "--ochre", icon: "peak" }
 ];
 
 /* ---------- map ---------- */
@@ -716,12 +780,13 @@ function loadPlace(p) {
   setLinks();
 
   initMap();
-  Object.values(layers).forEach(l => l.clearLayers()); centerLayer.clearLayers(); markerIndex = {};
+  Object.values(layers).forEach(l => l.clearLayers()); centerLayer.clearLayers(); markerIndex = {}; CANDS = new Map();
   const zoom = S.radius <= 5000 ? 13 : S.radius <= 10000 ? 12 : S.radius <= 20000 ? 11 : 10;
   map.setView([p.lat, p.lon], zoom);
   L.circle([p.lat, p.lon], { radius: S.radius, color: css("--pine"), weight: 1, fill: false, dashArray: "4 6", interactive: false }).addTo(centerLayer);
   if (p.gps) L.marker([p.lat, p.lon], { icon: L.divIcon({ className: "", html: '<div class="me-dot"></div>', iconSize: [16, 16] }) }).bindPopup("You are here").addTo(centerLayer);
   applySections();
+  restorePlan();
   setTimeout(() => map.invalidateSize(), 50);
   window.scrollTo({ top: 0 });
 
@@ -1062,6 +1127,7 @@ function renderLines(els) {
       const sub = [t.network && ({ iwn: "International", nwn: "National", rwn: "Regional", lwn: "Local" }[t.network] || t.network) + " route", t.distance && `${t.distance} km total`, t.description, t.operator].filter(Boolean).join(" · ");
       const line = L.polyline(segs, { color: trailCol, weight: 4, dashArray: "8 6", opacity: .9 }).bindPopup(popupHTML(name, sub || "Marked walking route", segs[0][0][0], segs[0][0][1], [["Route details", `https://hiking.waymarkedtrails.org/#route?id=${el.id}`]])).addTo(layers.trails);
       markerIndex[id] = line;
+      cand(id, "marked walking route", name, segs[0][0][0], segs[0][0][1], `${km(len)} in the area${sub ? "; " + sub : ""}`);
       routes.push({ id, name, sub: sub || "Marked walking route", right: km(len) + " here", links: [["Route details", `https://hiking.waymarkedtrails.org/#route?id=${el.id}`]], len });
     } else if (el.type === "way" && t.highway) {
       const segs = segments(el.geometry); if (!segs.length) continue;
@@ -1075,6 +1141,7 @@ function renderLines(els) {
   }
   const pathItems = [...paths.entries()].map(([name, p], i) => {
     const id = "p" + i; markerIndex[id] = L.polyline(p.segs);
+    if (p.len > 300) cand(id, "named footpath", name, p.segs[0][0][0], p.segs[0][0][1], [km(p.len), p.tags.sac_scale && "difficulty " + p.tags.sac_scale.replace(/_/g, " "), p.tags.surface].filter(Boolean).join("; "));
     return { id, name, sub: [p.tags.highway === "track" ? "track" : p.tags.highway, p.tags.sac_scale && "difficulty: " + p.tags.sac_scale.replace(/_/g, " "), p.tags.surface].filter(Boolean).join(" · "), right: km(p.len), len: p.len };
   }).filter(x => x.len > 150).sort((a, b) => b.len - a.len);
   // markerIndex for path groups needs to be on the map to fitBounds; use bounds only
@@ -1155,6 +1222,8 @@ function renderPOIs(els) {
       hist.push({ id, name, sub, right: km(dist), dist, links: [dirLink(c), ...extras.slice(1)], wiki: !!wl });
     }
   }
+  candFromMarkers("camp site", camp); candFromMarkers("picnic site", picnic); candFromMarkers("viewpoint or reserve", views);
+  candFromMarkers("farm or estate", farms); candFromMarkers("peak", peaks); candFromMarkers("historic site", hist);
   const byDist = (a, b) => a.dist - b.dist;
   const put = (sel, cnt, arr, key, emptyMsg, sort = byDist) => { arr.sort(sort); if (cnt) $(cnt).textContent = arr.length || ""; $(sel).innerHTML = itemsList(arr, key) || `<p class="empty">${emptyMsg}</p>`; };
   put("#camping", "#c-camp", camp, "camp", `No camp sites mapped within ${S.radius / 1000} km. Try a bigger radius.`);
@@ -1333,8 +1402,10 @@ document.addEventListener("click", async e => {
 async function loadWeather(live) {
   if (!navigator.onLine) return;
   try {
-    const d = await getJSON(`https://api.open-meteo.com/v1/forecast?${qs({ latitude: S.lat, longitude: S.lon, current: "temperature_2m,weather_code,wind_speed_10m", timezone: "auto" })}`);
+    const d = await getJSON(`https://api.open-meteo.com/v1/forecast?${qs({ latitude: S.lat, longitude: S.lon, current: "temperature_2m,weather_code,wind_speed_10m", daily: "sunrise,sunset,temperature_2m_max,temperature_2m_min,precipitation_probability_max,weather_code", forecast_days: 1, timezone: "auto" })}`);
     if (!live()) return;
+    const dd = d.daily, hm = t => (t || "").slice(11, 16);
+    if (dd?.time?.length) S.today = `Today's forecast: ${wmo(dd.weather_code[0])}, ${Math.round(dd.temperature_2m_min[0])}–${Math.round(dd.temperature_2m_max[0])}°C, ${dd.precipitation_probability_max[0] ?? "unknown"}% chance of rain. Sunrise ${hm(dd.sunrise[0])}, sunset ${hm(dd.sunset[0])}.`;
     const c = d.current; if (!c) return;
     $("#weatherNow").hidden = false;
     $("#weatherNow").textContent = `Now: ${Math.round(c.temperature_2m)}°C, ${wmo(c.weather_code)}, wind ${Math.round(c.wind_speed_10m)} km/h`;
@@ -1558,6 +1629,8 @@ out tags center qt;`;
       addPin("fun", id, c.lat, c.lon, popupHTML(name || label, sub, c.lat, c.lon, contactLinks(el, t, c).slice(1)));
       (fun[fk] ||= []).push({ id, name: name || label.charAt(0).toUpperCase() + label.slice(1), sub, right: km(dist), dist, links: contactLinks(el, t, c) });
     }
+    for (const [k, arr] of Object.entries(stay)) candFromMarkers("place to stay: " + STAY_GROUPS.find(g => g.k === k).label, arr);
+    for (const [k, arr] of Object.entries(fun)) candFromMarkers(FUN_GROUPS.find(g => g.k === k).label, arr);
     const groupHTML = (groups, data, key, max, emptyAll) => {
       let total = 0;
       const html = groups.map(g => {
@@ -1677,6 +1750,7 @@ async function loadNearby(live) {
     const pages = [...en, ...af.filter(p => !p.pageprops?.wikibase_item || !seen.has(p.pageprops.wikibase_item))]
       .filter(p => p.title !== S.wikiTitle && p.coordinates?.[0]).map(p => ({ ...p, dist: haversine(S, p.coordinates[0]) })).sort((a, b) => a.dist - b.dist).slice(0, 30);
     if (!pages.length) { $("#nearby").innerHTML = `<p class="empty">No encyclopaedia entries within 10 km.</p>`; return; }
+    pages.forEach(p => cand("w" + p.lang + p.pageid, "sight with an encyclopaedia entry", p.title, p.coordinates[0].lat, p.coordinates[0].lon, p.description || (p.extract || "").slice(0, 140)));
     pages.forEach(p => { const c = p.coordinates[0]; addPin("wiki", "w" + p.lang + p.pageid, c.lat, c.lon, popupHTML(p.title, p.description || "", c.lat, c.lon, [[p.lang === "af" ? "Wikipedia (Afrikaans)" : "Wikipedia", wikiUrl(p.title, p.lang)]])); });
     $("#nearby").innerHTML = `<div class="cols">${pages.map(p => `<article style="display:flex;gap:12px;align-items:flex-start;min-width:0" lang="${p.lang}">
       ${p.thumbnail ? `<img src="${esc(p.thumbnail.source)}" alt="" loading="lazy" style="width:84px;height:84px;object-fit:cover;border-radius:8px;flex:none">` : ""}
@@ -1689,6 +1763,103 @@ async function loadNearby(live) {
 
 
 
+
+
+/* ---------- plan a day ---------- */
+let planLine = null;
+const planKey = () => "placelore.plan." + packId(S);
+function candidateText() {
+  // The nearest few of each kind keeps the request small and the choices local
+  const byKind = {};
+  for (const c of [...CANDS.values()].sort((a, b) => a.dist - b.dist)) (byKind[c.kind] ||= []).push(c);
+  const lines = [];
+  for (const list of Object.values(byKind)) for (const c of list.slice(0, 12)) lines.push(`${c.id} | ${c.kind} | ${c.name} | ${(c.dist / 1000).toFixed(1)} km | ${c.info}`.replace(/\n/g, " "));
+  return lines.slice(0, 160).join("\n");
+}
+function planPrefs() {
+  const f = $("#planForm"), v = n => f.querySelector(`input[name="${n}"]:checked`)?.value;
+  const ints = [...f.querySelectorAll('input[name="int"]:checked')].map(i => i.value);
+  return { who: v("who"), pace: v("pace"), travel: v("travel"), interests: ints, start: $("#planStart").value || "09:00" };
+}
+function drawPlan(planData) {
+  layers.plan?.clearLayers();
+  const pts = planData.stops.map((st, i) => st.lat != null ? { ...st, n: i + 1 } : null).filter(Boolean);
+  for (const st of pts) {
+    L.marker([st.lat, st.lon], { icon: L.divIcon({ className: "pin", html: `<span class="plan-num">${st.n}</span>`, iconSize: [28, 28], iconAnchor: [14, 14], popupAnchor: [0, -14] }), zIndexOffset: 1000 })
+      .bindPopup(popupHTML(`${st.n}. ${st.title}`, `${st.time} · ${st.place_name}`, st.lat, st.lon)).addTo(layers.plan);
+  }
+  if (pts.length > 1) L.polyline(pts.map(p => [p.lat, p.lon]), { color: css("--ochre"), weight: 3, dashArray: "6 8", opacity: .9 }).addTo(layers.plan);
+}
+function renderPlan(planData) {
+  const stops = planData.stops, pts = stops.filter(st => st.lat != null);
+  const mode = planData.travel === "walking" ? "walking" : "driving";
+  let dirs = "";
+  if (pts.length >= 2) {
+    const ll = st => `${st.lat},${st.lon}`, mid = pts.slice(1, -1).slice(0, 8);
+    dirs = `https://www.google.com/maps/dir/?api=1&travelmode=${mode}&origin=${ll(pts[0])}&destination=${ll(pts[pts.length - 1])}${mid.length ? "&waypoints=" + encodeURIComponent(mid.map(ll).join("|")) : ""}`;
+  }
+  $("#planResult").innerHTML = `<article class="plan">
+    <div class="eyebrow">Your day · made ${esc(fmtDate(planData.madeAt))}</div>
+    <h3>${esc(planData.title)}</h3>
+    <p class="prose" style="margin:0">${esc(planData.summary)}</p>
+    <ol>${stops.map((st, i) => `<li><span class="n">${i + 1}</span>
+      <div class="t">${esc(st.time)}${st.duration_minutes ? ` · about ${st.duration_minutes >= 90 ? (st.duration_minutes / 60).toFixed(st.duration_minutes % 60 ? 1 : 0) + " h" : st.duration_minutes + " min"}` : ""}</div>
+      <div class="h">${esc(st.title)}</div>
+      ${st.place_name ? `<div class="where">${esc(st.place_name)}${st.lat != null ? ` · <button type="button" class="linkish" data-focus="${esc(st.place_id)}">Show on map</button> · <a href="https://www.google.com/maps/dir/?api=1&destination=${st.lat},${st.lon}" target="_blank" rel="noopener">Directions</a>` : ""}</div>` : ""}
+      <div class="prose" style="margin-top:4px">${esc(st.activity)}</div>
+      ${st.tip ? `<div class="tip">${esc(st.tip)}</div>` : ""}</li>`).join("")}</ol>
+    ${planData.notes?.length ? `<ul class="facts">${planData.notes.map(n => `<li>${esc(n)}</li>`).join("")}</ul>` : ""}
+    <div class="links">${dirs ? `<a href="${esc(dirs)}" target="_blank" rel="noopener">Directions for the whole day</a>` : ""}</div>
+    <p class="lang-note" style="margin-top:12px">Suggestions only: check opening times, access and conditions before you go.</p>
+    <div class="plan-actions"><button class="btn" type="button" id="planAgain">Make a different plan</button><button class="btn" type="button" id="planClear">Clear plan</button></div>
+  </article>`;
+  $("#planAgain").addEventListener("click", () => $("#planForm").requestSubmit());
+  $("#planClear").addEventListener("click", () => { try { localStorage.removeItem(planKey()); } catch {} $("#planResult").innerHTML = ""; layers.plan?.clearLayers(); });
+  drawPlan(planData);
+}
+function restorePlan() {
+  $("#planResult").innerHTML = ""; $("#planStatus").textContent = "";
+  const saved = store.get(planKey(), null);
+  if (saved?.stops) {
+    for (const st of saved.stops) if (st.place_id && st.lat != null) markerIndex[st.place_id] ||= { getLatLng: () => ({ lat: st.lat, lng: st.lon }), openPopup() {} };
+    renderPlan(saved);
+  }
+}
+$("#planForm").addEventListener("submit", async e => {
+  e.preventDefault();
+  if (!navigator.onLine) { $("#planStatus").textContent = "Planning needs a connection. A plan you made earlier stays here offline."; return; }
+  const place = S, prefs = planPrefs(), go = $("#planGo");
+  if (!prefs.interests.length) { $("#planStatus").textContent = "Pick at least one interest."; return; }
+  go.disabled = true;
+  $("#planStatus").textContent = "Gathering places from the page…";
+  await whenIdle(20000);
+  if (place !== S) return;
+  const candidates = candidateText();
+  if (!candidates) { $("#planStatus").textContent = "No places have loaded yet. Wait a moment and try again."; go.disabled = false; return; }
+  $("#planStatus").textContent = "Planning your day… this takes about half a minute.";
+  const now = new Date();
+  const body = {
+    place: `${S.name}${S.region ? ", " + S.region : ""}`,
+    about: ($("#ov-intro .prose")?.innerText || "").slice(0, 1500),
+    today: `${now.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" })}. ${S.today || $("#weatherNow").textContent || "No forecast available."}`,
+    prefs: `Group: ${prefs.who}. Pace: ${prefs.pace}. Getting around: ${prefs.travel}. Interests: ${prefs.interests.join(", ")}. Start at ${prefs.start}.`,
+    candidates
+  };
+  try {
+    const r = await fetch("/api/plan", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    const out = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(out.error || "The plan couldn't be made. Try again.");
+    if (place !== S) return;
+    for (const st of out.stops || []) { const c = st.place_id && CANDS.get(st.place_id); if (c) { st.lat = c.lat; st.lon = c.lon; } }
+    const planData = { ...out, travel: prefs.travel, madeAt: Date.now() };
+    store.set(planKey(), planData);
+    $("#planStatus").textContent = "";
+    renderPlan(planData);
+    $("#planResult").scrollIntoView({ behavior: "smooth", block: "start" });
+  } catch (err) {
+    $("#planStatus").textContent = err.message === "Failed to fetch" ? "No connection to the planner. Check your signal and try again." : err.message;
+  } finally { go.disabled = false; }
+});
 
 /* ---------- offline packs ---------- */
 const packs = (() => {
@@ -1800,6 +1971,7 @@ if ("serviceWorker" in navigator && location.protocol.startsWith("http")) naviga
 /* ---------- choose which sections to show ---------- */
 const SECTIONS = [
   { id: "s-overview", label: "Overview" },
+  { id: "s-plan", label: "Plan a day", layers: ["plan"] },
   { id: "s-stay", label: "Accommodation & farm stays", layers: ["stay"] },
   { id: "s-map", label: "Map" },
   { id: "s-history", label: "History", layers: ["hist"] },
@@ -1853,7 +2025,7 @@ document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("#prefs
 /* ---------- the place assistant ---------- */
 // The assistant answers from what this page has already loaded, sent as plain text.
 const CHAT_SOURCES = [
-  ["Overview", "#ov-intro"], ["Facts", "#factbox"], ["Name origin", "#ov-name"], ["Interesting facts", "#ov-facts"],
+  ["Overview", "#ov-intro"], ["Today's plan", "#planResult"], ["Facts", "#factbox"], ["Name origin", "#ov-name"], ["Interesting facts", "#ov-facts"],
   ["Accommodation", "#stay"], ["History", "#hist-wiki"], ["Historic sites", "#hist-sites"],
   ["Walking trails", "#trails"], ["Camping", "#camping"], ["Picnic sites", "#picnic"], ["Viewpoints and reserves", "#views"],
   ["Climate", "#climate"], ["Rivers", "#rivers"], ["Geology", "#geology"], ["Peaks", "#peaks"], ["Landscape", "#geo-wiki"],
