@@ -1,0 +1,133 @@
+// Placelore server: serves the app and streams answers for "Ask about this place".
+// The browser sends a text summary of the data it has already loaded, so the
+// server does no data fetching of its own.
+import http from "node:http";
+import { readFile } from "node:fs/promises";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const here = path.dirname(fileURLToPath(import.meta.url));
+const PORT = process.env.PORT || 8080;
+const MODEL = "claude-opus-5-5";
+const LIMITS = { bodyBytes: 200_000, messages: 20, messageChars: 4000, contextChars: 60_000, perIpPer10Min: 30 };
+
+const SYSTEM = `You are the Placelore guide, a friendly local expert for travellers in a place they are visiting.
+
+Answer from the place data you are given below. It comes from Wikipedia, Wikidata, OpenStreetMap, iNaturalist, Open-Meteo and Macrostrat and was loaded in the traveller's app. You may add widely known general knowledge about the region, but say so when you go beyond the data, and say plainly when the data doesn't cover something.
+
+Keep answers short and practical: a few sentences, or a short list when listing places. Write for a phone screen. Use plain text with simple "- " bullets; no tables or headings.
+
+Never invent phone numbers, prices, opening hours, availability, or business registration status. When someone needs those, point them to a search instead, using these links where they fit:
+- Google Maps: https://www.google.com/maps/search/<what>+near+<place>
+- Booking.com: https://www.booking.com/searchresults.html?ss=<place>
+- Yellow Pages South Africa: https://www.yellowpages.co.za/
+- CIPC BizPortal (South African company registration): https://www.bizportal.gov.za/
+
+Do not reproduce passages from copyrighted books, such as T.V. Bulpin's Discovering Southern Africa. You may mention a book and suggest the reader look it up.
+
+For emergencies, give the emergency numbers from the place data first, and tell the traveller to call them.`;
+
+let client = null;
+async function getClient() {
+  if (!process.env.ANTHROPIC_API_KEY) return null;
+  if (!client) {
+    const { default: Anthropic } = await import("@anthropic-ai/sdk");
+    client = new Anthropic();
+  }
+  return client;
+}
+
+const hits = new Map(); // ip -> timestamps of recent requests
+function rateLimited(ip) {
+  const now = Date.now(), recent = (hits.get(ip) || []).filter(t => now - t < 600_000);
+  recent.push(now); hits.set(ip, recent);
+  if (hits.size > 5000) hits.clear();
+  return recent.length > LIMITS.perIpPer10Min;
+}
+
+function readBody(req) {
+  return new Promise((resolve, reject) => {
+    let size = 0; const chunks = [];
+    req.on("data", c => { size += c.length; if (size > LIMITS.bodyBytes) { reject(new Error("too_large")); req.destroy(); } else chunks.push(c); });
+    req.on("end", () => resolve(Buffer.concat(chunks).toString("utf8")));
+    req.on("error", reject);
+  });
+}
+
+function cleanMessages(raw) {
+  if (!Array.isArray(raw)) return null;
+  const msgs = raw.slice(-LIMITS.messages)
+    .filter(m => m && (m.role === "user" || m.role === "assistant") && typeof m.content === "string" && m.content.trim())
+    .map(m => ({ role: m.role, content: m.content.slice(0, LIMITS.messageChars) }));
+  while (msgs.length && msgs[0].role !== "user") msgs.shift();
+  return msgs.length && msgs[msgs.length - 1].role === "user" ? msgs : null;
+}
+
+async function chat(req, res) {
+  const ip = (req.headers["x-forwarded-for"] || req.socket.remoteAddress || "").split(",")[0].trim();
+  const fail = (code, msg) => { res.writeHead(code, { "Content-Type": "application/json" }); res.end(JSON.stringify({ error: msg })); };
+  if (rateLimited(ip)) return fail(429, "You're asking quickly. Wait a few minutes and try again.");
+  const anthropic = await getClient();
+  if (!anthropic) return fail(503, "The assistant isn't set up yet: the server has no Anthropic API key.");
+
+  let body;
+  try { body = JSON.parse(await readBody(req)); } catch { return fail(400, "The question couldn't be read. Try again."); }
+  const messages = cleanMessages(body.messages);
+  if (!messages) return fail(400, "Type a question first.");
+  const place = String(body.place || "this place").slice(0, 200);
+  const context = String(body.context || "").slice(0, LIMITS.contextChars);
+
+  res.writeHead(200, { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-cache", "X-Accel-Buffering": "no" });
+  const controller = new AbortController();
+  res.on("close", () => { if (!res.writableEnded) controller.abort(); });
+  try {
+    const stream = anthropic.beta.messages.stream({
+      model: MODEL,
+      max_tokens: 4000,
+      output_config: { effort: "low" },
+      betas: ["server-side-fallback-2026-07-01"],
+      fallbacks: "default",
+      system: [
+        { type: "text", text: SYSTEM },
+        // The place data stays the same for every question about one place, so it is cached
+        { type: "text", text: `Place: ${place}\n\nPlace data loaded in the app:\n${context}`, cache_control: { type: "ephemeral" } }
+      ],
+      messages
+    }, { signal: controller.signal });
+    for await (const event of stream) {
+      if (event.type === "content_block_delta" && event.delta.type === "text_delta") res.write(event.delta.text);
+    }
+    const final = await stream.finalMessage();
+    if (final.stop_reason === "refusal") res.write("\n\nSorry, I can't help with that one. Try asking another way.");
+    else if (final.stop_reason === "max_tokens") res.write("\n\n(Answer cut short. Ask me to continue.)");
+    res.end();
+  } catch (err) {
+    if (controller.signal.aborted) return;
+    console.error("chat error", err?.status, err?.message);
+    const busy = err?.status === 429 || err?.status === 529 || err?.status >= 500;
+    res.end(busy ? "\n\nThe assistant is busy right now. Try again in a minute." : "\n\nSomething went wrong answering that. Try again.");
+  }
+}
+
+const TYPES = { ".html": "text/html; charset=utf-8", ".js": "text/javascript", ".css": "text/css", ".json": "application/json", ".png": "image/png", ".svg": "image/svg+xml" };
+async function serveStatic(req, res) {
+  const url = new URL(req.url, "http://x");
+  let file = path.normalize(decodeURIComponent(url.pathname)).replace(/^(\.\.[/\\])+/, "");
+  if (file === "/" || !path.extname(file)) file = "/index.html";
+  try {
+    const data = await readFile(path.join(here, "public", file));
+    res.writeHead(200, { "Content-Type": TYPES[path.extname(file)] || "application/octet-stream", "Cache-Control": "no-cache" });
+    res.end(data);
+  } catch {
+    res.writeHead(404, { "Content-Type": "text/plain" }); res.end("Not found");
+  }
+}
+
+http.createServer((req, res) => {
+  if (req.url.startsWith("/api/chat")) {
+    if (req.method !== "POST") { res.writeHead(405); return res.end(); }
+    return chat(req, res).catch(err => { console.error(err); if (!res.headersSent) res.writeHead(500); res.end(); });
+  }
+  if (req.url === "/healthz") { res.writeHead(200); return res.end("ok"); }
+  return serveStatic(req, res);
+}).listen(PORT, () => console.log(`Placelore listening on ${PORT}`));

@@ -187,6 +187,25 @@ ul.items .acts button{background:none;border:0;padding:0;color:var(--pine);font:
 .recent{margin-top:28px}
 .recent .row button{font-size:.9rem}
 footer{padding-block:24px 40px;color:var(--muted);font-size:.85rem}
+
+/* place assistant */
+.ask-fab{position:fixed;right:max(16px,calc(env(safe-area-inset-right,0px) + 12px));bottom:calc(env(safe-area-inset-bottom,0px) + 16px);z-index:1200;box-shadow:0 6px 20px rgb(0 0 0 / .25);padding:14px 18px;border-radius:999px}
+.chat{position:fixed;z-index:1300;right:max(12px,env(safe-area-inset-right,0px));bottom:calc(env(safe-area-inset-bottom,0px) + 12px);width:min(420px,calc(100vw - 24px));height:min(620px,calc(100dvh - 90px));background:var(--surface);border:1px solid var(--line);border-radius:16px;box-shadow:0 16px 48px rgb(0 0 0 / .3);display:flex;flex-direction:column;overflow:hidden}
+.chat header{display:flex;align-items:center;gap:8px;padding:12px 14px;border-bottom:1px solid var(--line)}
+.chat header b{font:700 1.05rem var(--display);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chat header button{background:none;border:0;color:var(--muted);font:inherit;cursor:pointer;padding:6px}
+.chat .log{flex:1;overflow-y:auto;padding:12px 14px;display:flex;flex-direction:column;gap:10px}
+.msg{max-width:88%;padding:9px 12px;border-radius:12px;white-space:pre-wrap;overflow-wrap:anywhere;font-size:.95rem}
+.msg.user{align-self:flex-end;background:var(--pine);color:var(--surface);border-bottom-right-radius:4px}
+.msg.assistant{align-self:flex-start;background:var(--paper);border-bottom-left-radius:4px}
+.msg.assistant a{color:var(--pine)}
+.msg.note{align-self:center;background:none;color:var(--muted);font-size:.85rem;text-align:center}
+.chat .hint{display:flex;flex-wrap:wrap;gap:6px}
+.chat .hint button{font:inherit;font-size:.85rem;padding:6px 10px;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer}
+.chat form{display:flex;gap:6px;padding:10px;border-top:1px solid var(--line);align-items:flex-end}
+.chat textarea{flex:1;min-width:0;resize:none;font:inherit;padding:9px 10px;border-radius:10px;border:1px solid var(--line);background:var(--paper);color:var(--ink);max-height:120px}
+.chat .mic{padding:10px}
+.chat .mic[aria-pressed="true"]{background:var(--help);border-color:var(--help);color:var(--surface)}
 </style>
 </head>
 <body>
@@ -291,14 +310,6 @@ footer{padding-block:24px 40px;color:var(--muted);font-size:.85rem}
       <p class="lede">The detailed story of the place from the encyclopaedia, plus historic sites mapped nearby.</p>
       <div id="hist-wiki"><p class="loading">Reading the history…</p></div>
       <div id="hist-deep"></div>
-      <div class="callout bulpin" id="bulpin">
-        <div class="eyebrow">From the bookshelf</div>
-        <h3 style="margin-top:2px">T.V. Bulpin, <i>Discovering Southern Africa</i></h3>
-        <p style="margin:0 0 8px">Bulpin's classic travel guide covers almost every town, pass and river in the region, with the stories behind the names. The book is still under copyright, so Placelore can't show its text. Use these links to find the entry for <b class="bp-name">this place</b>, and keep your own notes from your copy below.</p>
-        <div class="links" id="bulpin-links" style="margin-top:4px"></div>
-        <label for="bulpinNotes" style="display:block;font-weight:600;margin-top:12px">My notes from the book <span style="font-weight:400;color:var(--muted)">(saved on this phone, per place)</span></label>
-        <textarea id="bulpinNotes" rows="4" style="width:100%;margin-top:6px;font:inherit;padding:10px;border-radius:10px;border:1px solid var(--line);background:var(--surface);color:var(--ink)" placeholder="e.g. p. 212: founded in 1679 by Simon van der Stel, who named it after himself…"></textarea>
-      </div>
       <h3>Historic sites nearby</h3>
       <div id="hist-sites"><p class="loading">Searching the map…</p></div>
       <div class="links" id="hist-links"></div>
@@ -383,6 +394,17 @@ footer{padding-block:24px 40px;color:var(--muted);font-size:.85rem}
   <footer class="wrap">Data: © OpenStreetMap contributors, Wikipedia &amp; Wikidata (CC BY-SA), iNaturalist, Open-Meteo, Macrostrat, OpenTopoMap, Esri. Map data can be incomplete; trails and access may change.</footer>
 </div>
 
+
+<button class="btn primary ask-fab" id="askFab" type="button" hidden>Ask about this place</button>
+<div class="chat" id="chat" role="dialog" aria-label="Ask about this place" hidden>
+  <header><b id="chatTitle">Ask about this place</b><button type="button" id="chatClear" title="Start a new conversation">New chat</button><button type="button" id="chatClose" aria-label="Close">✕</button></header>
+  <div class="log" id="chatLog" aria-live="polite"></div>
+  <form id="chatForm">
+    <textarea id="chatInput" rows="1" placeholder="Ask anything about this place" aria-label="Your question"></textarea>
+    <button class="btn mic" type="button" id="chatMic" title="Speak your question" aria-label="Speak your question" hidden><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 14a3 3 0 0 0 3-3V5a3 3 0 1 0-6 0v6a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.9V21h2v-3.1a7 7 0 0 0 6-6.9z"/></svg></button>
+    <button class="btn primary" type="submit" id="chatSend">Send</button>
+  </form>
+</div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script>
 "use strict";
@@ -408,7 +430,7 @@ const km = m => m < 1000 ? `${Math.round(m)} m` : `${(m / 1000).toFixed(m < 1000
 const loading = t => `<p class="loading">${esc(t)}</p>`;
 const errHTML = (msg, fn) => `<p class="err">${esc(msg)} <button class="btn" type="button" data-retry="${fn}">Try again</button></p>`;
 const paras = text => text.split(/\n+/).map(s => s.trim()).filter(Boolean).map(p => `<p>${esc(p)}</p>`).join("");
-const sentences = text => text.replace(/\s+/g, " ").split(/(?<=[.!?])\s+(?=[A-Z0-9"“(])/);
+const sentences = text => text.replace(/\n*={2,6}[^=\n]+={2,6}\n*/g, "\n").replace(/\s+/g, " ").split(/(?<=[.!?])\s+(?=[A-Z0-9"“(])/);
 const wikiUrl = t => `https://${LANG}.wikipedia.org/wiki/${encodeURIComponent(t.replace(/ /g, "_"))}`;
 function wikiTagUrl(tag) { if (!tag) return null; const m = tag.match(/^([a-z-]+):(.+)$/); return m ? `https://${m[1]}.wikipedia.org/wiki/${encodeURIComponent(m[2].replace(/ /g, "_"))}` : null; }
 const linkBtns = arr => arr.filter(Boolean).map(([t, u]) => `<a href="${esc(u)}" target="_blank" rel="noopener">${esc(t)}</a>`).join("");
@@ -588,7 +610,7 @@ function loadPlace(p) {
   const my = ++token;
   stopSound();
   const live = () => my === token;
-  $("#welcome").hidden = true; $("#app").hidden = false;
+  $("#welcome").hidden = true; $("#app").hidden = false; $("#askFab").hidden = false; chatSwitch();
   document.title = `${p.name} · Placelore`;
   $("#placeName").textContent = p.name;
   $("#placeKind").textContent = p.gps ? `You are here · ${p.kind || "location"}` : (p.kind || "place");
@@ -643,18 +665,6 @@ function setLinks(title) {
     ["Old maps of the area", `https://www.oldmapsonline.org/en/#position=13/${S.lat}/${S.lon}`],
     ["Wikimedia Commons photos", `https://commons.wikimedia.org/w/index.php?search=${encodeURIComponent(n)}`]
   ]);
-  const bq = s => encodeURIComponent(s);
-  document.querySelector("#bulpin .bp-name").textContent = n;
-  $("#bulpin-links").innerHTML = linkBtns([
-    ["Search inside the book (Google Books)", `https://www.google.com/search?tbm=bks&q=${bq(`"${n}" Bulpin "Discovering Southern Africa"`)}`],
-    ["Internet Archive copies", `https://archive.org/search?query=${bq("Bulpin Discovering Southern Africa")}`],
-    ["Find a copy to buy", `https://www.google.com/search?tbm=shop&q=${bq("T.V. Bulpin Discovering Southern Africa")}`],
-    ["SA History Online", `https://www.sahistory.org.za/search?search_api_fulltext=${bq(n)}`],
-    ["About T.V. Bulpin", "https://en.wikipedia.org/wiki/T._V._Bulpin"]
-  ]);
-  const nk = "placelore.notes." + n.toLowerCase();
-  $("#bulpinNotes").value = store.get(nk, "");
-  $("#bulpinNotes").oninput = e => store.set(nk, e.target.value);
   $("#out-links").innerHTML = linkBtns([
     ["Waymarked hiking routes", `https://hiking.waymarkedtrails.org/#?map=13/${S.lat}/${S.lon}`],
     ["AllTrails", `https://www.alltrails.com/search?q=${encodeURIComponent(n)}`],
@@ -1108,11 +1118,12 @@ const GROUPS = [
   { key: "plants", label: "Wildflowers & plants", p: { iconic_taxa: "Plantae" }, n: 30 },
   { key: "fish", label: "Fish", p: { iconic_taxa: "Actinopterygii" }, n: 18 }
 ];
-const natureCache = {};
+const natureCache = {}, natureLoaded = {};
 async function loadNature(live) {
   const tabs = $("#natureTabs");
   tabs.innerHTML = GROUPS.map((g, i) => `<button type="button" role="tab" aria-selected="${i === 0}" data-g="${g.key}">${esc(g.label)}</button>`).join("");
   for (const k in natureCache) delete natureCache[k];
+  for (const k in natureLoaded) delete natureLoaded[k];
   tabs.querySelectorAll("button").forEach(b => b.addEventListener("click", () => {
     tabs.querySelectorAll("button").forEach(x => x.setAttribute("aria-selected", x === b)); showGroup(b.dataset.g, live);
   }));
@@ -1122,7 +1133,7 @@ async function loadNature(live) {
 function fetchGroup(g) {
   if (natureCache[g.key]) return natureCache[g.key];
   const url = `https://api.inaturalist.org/v1/observations/species_counts?${qs({ lat: S.lat, lng: S.lon, radius: Math.max(S.radius / 1000, 10), quality_grade: "research", per_page: g.n, locale: LANG, ...g.p })}`;
-  return (natureCache[g.key] = getJSON(url).then(d => d.results || []));
+  return (natureCache[g.key] = getJSON(url).then(d => { const r = d.results || []; natureLoaded[g.label] = r.slice(0, 15).map(x => `${x.taxon.preferred_common_name || x.taxon.name} (${x.taxon.name}, ${x.count} sightings)`); return r; }));
 }
 async function showGroup(key, live) {
   const g = GROUPS.find(x => x.key === key);
@@ -1511,6 +1522,100 @@ async function loadNearby(live) {
       <p style="margin:4px 0;font-size:.95rem">${esc(p.extract || "")}</p>
       <div class="acts" style="display:flex;gap:12px;font-size:.88rem"><button type="button" data-focus="w${p.pageid}" style="background:none;border:0;padding:0;color:var(--pine);text-decoration:underline;cursor:pointer;font:inherit">Show on map</button><a href="${wikiUrl(p.title)}" target="_blank" rel="noopener">Read more ↗</a></div></div></article>`).join("")}</div>`;
   } catch (err) { if (live()) $("#nearby").innerHTML = errHTML(`Nearby articles did not load (${err.message}).`, "nearby"); }
+}
+
+
+/* ---------- the place assistant ---------- */
+// The assistant answers from what this page has already loaded, sent as plain text.
+const CHAT_SOURCES = [
+  ["Overview", "#ov-intro"], ["Facts", "#factbox"], ["Name origin", "#ov-name"], ["Interesting facts", "#ov-facts"],
+  ["Accommodation", "#stay"], ["History", "#hist-wiki"], ["Historic sites", "#hist-sites"],
+  ["Walking trails", "#trails"], ["Camping", "#camping"], ["Picnic sites", "#picnic"], ["Viewpoints and reserves", "#views"],
+  ["Climate", "#climate"], ["Rivers", "#rivers"], ["Geology", "#geology"], ["Peaks", "#peaks"], ["Landscape", "#geo-wiki"],
+  ["Farms", "#farms"], ["Land use", "#landuse"], ["Economy", "#farm-wiki"], ["Famous people", "#people"], ["Nearby sights", "#nearby"],
+  ["Emergency numbers", "#help-numbers"], ["Nearest help", "#help-places"], ["Food, fun and recreation", "#fun"]
+];
+const UI_WORDS = /\b(Show on map|Directions|OSM|More on Google Maps|Booking\.com|Search nearby|Show all \d+|Continue reading.*?paragraphs\)|Read the full .*? article ↗|Try again|Call)\b/g;
+function placeContext() {
+  const parts = [`Place: ${S.name}${S.region ? ", " + S.region : ""}. Coordinates ${S.lat.toFixed(4)}, ${S.lon.toFixed(4)}. Search radius ${S.radius / 1000} km.`, $("#weatherNow").hidden ? "" : $("#weatherNow").textContent];
+  for (const [label, sel] of CHAT_SOURCES) {
+    const el = $(sel); if (!el) continue;
+    const t = el.innerText.replace(UI_WORDS, "").replace(/[ \t]+/g, " ").replace(/\n\s*\n+/g, "\n").trim();
+    if (t && !/^(Loading|Finding|Looking|Reading|Gathering|Tracing|Searching|Crunching|Checking)/.test(t)) parts.push(`## ${label}\n${t.slice(0, 5000)}`);
+  }
+  for (const [g, list] of Object.entries(natureLoaded)) if (list.length) parts.push(`## Wildlife: ${g}\n${list.join("\n")}`);
+  return parts.filter(Boolean).join("\n\n").slice(0, 60000);
+}
+let chatMsgs = [], chatKey = "", chatBusy = false, chatAbort = null;
+const chatStoreKey = () => "placelore.chat." + (S ? S.name.toLowerCase() : "");
+function chatSwitch() {
+  if (chatAbort) chatAbort.abort();
+  chatKey = chatStoreKey(); chatMsgs = store.get(chatKey, []);
+  $("#chatTitle").textContent = `Ask about ${S.name}`;
+  renderChat();
+}
+function fmtReply(text) {
+  return esc(text).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>").replace(/(https?:\/\/[^\s<>()]+[^\s<>().,;:!?])/g, '<a href="$1" target="_blank" rel="noopener">$1</a>');
+}
+function renderChat() {
+  const log = $("#chatLog");
+  if (!chatMsgs.length) {
+    const ideas = [`What's the story of ${S.name} in a nutshell?`, "Where can we walk this afternoon?", "Which birds should we look out for?", "Where can we stay on a farm?", "Is there something fun for kids?"];
+    log.innerHTML = `<div class="msg note">Ask me anything about ${esc(S.name)}. I answer from the information on this page, and tell you when it doesn't cover something.</div><div class="hint">${ideas.map(q => `<button type="button">${esc(q)}</button>`).join("")}</div>`;
+    log.querySelectorAll(".hint button").forEach(b => b.addEventListener("click", () => sendChat(b.textContent)));
+    return;
+  }
+  log.innerHTML = chatMsgs.map(m => `<div class="msg ${m.role}">${m.role === "assistant" ? fmtReply(m.content) : esc(m.content)}</div>`).join("");
+  log.scrollTop = log.scrollHeight;
+}
+async function sendChat(text) {
+  text = text.trim(); if (!text || chatBusy) return;
+  chatBusy = true; $("#chatSend").disabled = true; $("#chatInput").value = "";
+  chatMsgs.push({ role: "user", content: text }, { role: "assistant", content: "" });
+  renderChat();
+  const bubble = $("#chatLog").lastElementChild; bubble.textContent = "Thinking…";
+  const key = chatKey, reply = chatMsgs[chatMsgs.length - 1];
+  chatAbort = new AbortController();
+  try {
+    const r = await fetch("/api/chat", { method: "POST", headers: { "Content-Type": "application/json" }, signal: chatAbort.signal,
+      body: JSON.stringify({ place: S.name, context: placeContext(), messages: chatMsgs.slice(0, -1) }) });
+    if (!r.ok) { let msg = "The assistant couldn't answer."; try { msg = (await r.json()).error || msg; } catch {} throw new Error(msg); }
+    const reader = r.body.getReader(), dec = new TextDecoder();
+    for (;;) {
+      const { done, value } = await reader.read(); if (done) break;
+      reply.content += dec.decode(value, { stream: true });
+      if (key === chatKey) { bubble.innerHTML = fmtReply(reply.content); $("#chatLog").scrollTop = $("#chatLog").scrollHeight; }
+    }
+    if (!reply.content.trim()) throw new Error("No answer came back. Try again.");
+  } catch (err) {
+    if (err.name === "AbortError") { chatMsgs.splice(-2); }
+    else { chatMsgs.pop(); chatMsgs.pop(); if (key === chatKey) { renderChat(); $("#chatLog").insertAdjacentHTML("beforeend", `<div class="msg note">${esc(err.message === "Failed to fetch" ? "No connection to the assistant. Check your signal and try again." : err.message)}</div>`); $("#chatInput").value = text; } }
+  } finally {
+    if (key === chatKey) store.set(key, chatMsgs.slice(-40));
+    chatBusy = false; $("#chatSend").disabled = false; chatAbort = null;
+  }
+}
+$("#askFab").addEventListener("click", () => { $("#chat").hidden = false; $("#askFab").hidden = true; $("#chatInput").focus(); });
+$("#chatClose").addEventListener("click", () => { $("#chat").hidden = true; $("#askFab").hidden = false; stopMic(); });
+$("#chatClear").addEventListener("click", () => { if (chatAbort) chatAbort.abort(); chatMsgs = []; store.set(chatKey, []); renderChat(); });
+$("#chatForm").addEventListener("submit", e => { e.preventDefault(); stopMic(); sendChat($("#chatInput").value); });
+$("#chatInput").addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); $("#chatForm").requestSubmit(); } });
+
+// Dictation with the browser's own speech recognition (Chrome and Safari)
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+let rec = null;
+function stopMic() { if (rec) { rec.stop(); rec = null; } $("#chatMic").removeAttribute("aria-pressed"); }
+if (SR) {
+  $("#chatMic").hidden = false;
+  $("#chatMic").addEventListener("click", () => {
+    if (rec) return stopMic();
+    rec = new SR(); rec.lang = navigator.language || "en-ZA"; rec.interimResults = true; rec.continuous = false;
+    const before = $("#chatInput").value ? $("#chatInput").value.trim() + " " : "";
+    rec.onresult = e => { $("#chatInput").value = before + [...e.results].map(r => r[0].transcript).join(""); };
+    rec.onerror = e => { stopMic(); if (e.error === "not-allowed") $("#chatLog").insertAdjacentHTML("beforeend", `<div class="msg note">Microphone access was blocked. Allow it in your browser settings to speak your questions.</div>`); };
+    rec.onend = () => { rec = null; $("#chatMic").removeAttribute("aria-pressed"); };
+    rec.start(); $("#chatMic").setAttribute("aria-pressed", "true");
+  });
 }
 
 /* ---------- header height for sticky nav ---------- */

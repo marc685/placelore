@@ -1,2 +1,5 @@
-README.md
+node_modules
 .git
+*.md
+*.pdf
+cloudrun-for-lovable
