@@ -68,7 +68,12 @@ async function chat(req, res) {
   const fail = (code, msg) => { res.writeHead(code, { "Content-Type": "application/json" }); res.end(JSON.stringify({ error: msg })); };
   if (rateLimited(ip)) return fail(429, "You're asking quickly. Wait a few minutes and try again.");
   const anthropic = await getClient();
-  if (!anthropic) return fail(503, "The assistant isn't set up yet: the server has no Anthropic API key.");
+  if (!anthropic) {
+    // Names only, never values, so a misnamed setting is easy to spot
+    const similar = Object.keys(process.env).filter(k => /anthropic|api_?key|claude/i.test(k));
+    return fail(503, "The assistant isn't set up yet: the server has no ANTHROPIC_API_KEY setting." +
+      (similar.length ? ` It did find: ${similar.join(", ")}. Rename that to ANTHROPIC_API_KEY.` : " No similar setting was found either."));
+  }
 
   let body;
   try { body = JSON.parse(await readBody(req)); } catch { return fail(400, "The question couldn't be read. Try again."); }
