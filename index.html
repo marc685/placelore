@@ -566,7 +566,12 @@ $("#searchForm").addEventListener("submit", async e => {
   const q = $("#q").value.trim(); if (!q) return;
   sug.hidden = false; sug.innerHTML = `<button type="button" disabled>Searching…</button>`;
   try {
-    const res = await searchPlaces(q);
+    const SETTLEMENT = ["city", "town", "village", "hamlet", "suburb", "neighbourhood", "isolated_dwelling", "farm"];
+    const rank = r => SETTLEMENT.includes(r.addresstype) ? 0 : /municipality|district|county|state|region/.test(r.addresstype || r.type) ? 2 : 1;
+    // Towns and villages before municipalities and districts of the same name
+    const res = (await searchPlaces(q)).map((r, i) => ({ r, i })).sort((a, b) => rank(a.r) - rank(b.r) || a.i - b.i).map(x => x.r);
+    const exact = res.find(r => rank(r) === 0 && (r.name || "").toLowerCase() === q.toLowerCase().split(",")[0].trim());
+    if (exact && res.filter(r => rank(r) === 0 && (r.name || "").toLowerCase() === exact.name.toLowerCase()).length === 1) { sug.hidden = true; return loadPlace(placeFromNominatim(exact)); }
     if (!res.length) { sug.innerHTML = `<button type="button" disabled>No place found called “${esc(q)}”. Check the spelling or add the country.</button>`; return; }
     if (res.length === 1) { sug.hidden = true; return loadPlace(placeFromNominatim(res[0])); }
     sug.innerHTML = res.map((r, i) => `<button type="button" data-i="${i}">${esc(r.name || r.display_name.split(",")[0])}<small>${esc(r.display_name)}</small></button>`).join("");
