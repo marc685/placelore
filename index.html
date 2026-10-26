@@ -6,6 +6,8 @@
 <meta name="theme-color" content="#24553f">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <title>Placelore</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="apple-touch-icon" href="/icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zilla+Slab:wght@500;700&family=Source+Sans+3:ital,wght@0,400;0,600;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap">
@@ -188,6 +190,14 @@ ul.items .acts button{background:none;border:0;padding:0;color:var(--pine);font:
 .recent .row button{font-size:.9rem}
 footer{padding-block:24px 40px;color:var(--muted);font-size:.85rem}
 
+/* offline packs */
+.save-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:12px}
+.save-row .btn svg{width:18px;height:18px}
+.save-row .btn[data-saved="true"]{border-color:var(--pine);background:var(--pine-soft)}
+.save-status{color:var(--muted);font-size:.9rem}
+.offline-pill{background:var(--ochre);color:var(--surface)}
+.packs{max-width:560px;margin-top:6px}
+.packs .del{background:none;border:0;color:var(--muted);font:inherit;font-size:.88rem;cursor:pointer;text-decoration:underline;padding:0}
 /* section chooser */
 .chip-btn{flex:none;display:inline-flex;align-items:center;gap:6px;font:600 .9rem var(--body);padding:6px 12px;border-radius:999px;border:1px solid var(--pine);background:var(--pine-soft);color:var(--ink);cursor:pointer}
 .chip-btn svg{width:16px;height:16px;fill:currentColor}
@@ -253,6 +263,10 @@ footer{padding-block:24px 40px;color:var(--muted);font-size:.85rem}
     <button class="btn" type="button" data-example="Franschhoek">Try Franschhoek</button>
     <button class="btn" type="button" data-example="Grindelwald">Try Grindelwald</button>
   </div>
+  <div class="recent" id="packs" hidden>
+    <div class="eyebrow">Saved for offline</div>
+    <ul class="items packs" id="packList"></ul>
+  </div>
   <div class="recent" id="recent" hidden>
     <div class="eyebrow">Recently visited</div>
     <div class="row" id="recentRow"></div>
@@ -268,7 +282,9 @@ footer{padding-block:24px 40px;color:var(--muted);font-size:.85rem}
       <span class="mono" id="placeCoords"></span>
       <span class="mono" id="placeElev"></span>
       <span class="pill" id="weatherNow" hidden></span>
+      <span class="pill offline-pill" id="offlinePill" hidden></span>
     </div>
+    <div class="save-row"><button class="btn" type="button" id="saveOffline"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M11 3h2v9.2l3.3-3.3 1.4 1.4L12 16 6.3 10.3l1.4-1.4 3.3 3.3zM4 18h16v2H4z"/></svg><span>Save for offline</span></button><span class="save-status" id="saveStatus"></span></div>
   </div>
 
   <nav class="chapters" aria-label="Chapters"><div class="wrap">
@@ -438,12 +454,36 @@ const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt
 const qs = o => new URLSearchParams(o).toString();
 const LANG = "en";
 const WP = `https://${LANG}.wikipedia.org/w/api.php`;
+/* Every response a place loads is kept in RECORD so it can be saved as an offline pack;
+   when the network fails, the saved pack answers instead. */
+let RECORD = new Map(), ACTIVE_PACK = null, inflight = 0;
+const idleWaiters = [];
+const reqKey = (url, opts) => (url.includes("/api/interpreter") ? "overpass" : url) + "|" + (opts.body || "");
+const recordable = url => !/nominatim\.openstreetmap\.org\/search|api\.open-meteo\.com\/v1\/forecast/.test(url);
 async function getJSON(url, opts = {}, ms = 30000) {
+  const key = reqKey(url, opts);
+  const fromPack = async () => { const pack = await ACTIVE_PACK; return pack?.responses?.[key]; };
+  if (!navigator.onLine) { const d = await fromPack(); if (d !== undefined) { RECORD.set(key, d); return d; } }
+  inflight++;
   const c = new AbortController(); const t = setTimeout(() => c.abort(), ms);
-  try { const r = await fetch(url, { ...opts, signal: c.signal }); if (!r.ok) throw new Error(r.status === 429 ? "the server is busy" : `${r.status} ${r.statusText}`); return await r.json(); }
-  catch (e) { throw e.name === "AbortError" ? new Error("the server took too long to answer") : e.message === "Failed to fetch" ? new Error("no connection to the server") : e; }
-  finally { clearTimeout(t); }
+  try {
+    const r = await fetch(url, { ...opts, signal: c.signal }); if (!r.ok) throw new Error(r.status === 429 ? "the server is busy" : `${r.status} ${r.statusText}`);
+    const data = await r.json();
+    if (recordable(url)) RECORD.set(key, data);
+    return data;
+  } catch (e) {
+    const d = await fromPack(); if (d !== undefined) { RECORD.set(key, d); return d; }
+    throw e.name === "AbortError" ? new Error("the server took too long to answer") : e.message === "Failed to fetch" ? new Error(navigator.onLine ? "no connection to the server" : "you're offline and this isn't saved") : e;
+  } finally {
+    clearTimeout(t); inflight--;
+    if (!inflight) setTimeout(() => { if (!inflight) idleWaiters.splice(0).forEach(f => f()); }, 1500);
+  }
 }
+// Resolves once no request has been in flight for 1.5 s (false if ms passes first)
+const whenIdle = ms => new Promise(res => {
+  idleWaiters.push(() => res(true)); setTimeout(() => res(false), ms);
+  if (!inflight) setTimeout(() => { if (!inflight) res(true); }, 1500);
+});
 const wp = params => getJSON(`${WP}?${qs({ format: "json", formatversion: 2, origin: "*", ...params })}`);
 function haversine(a, b) {
   const R = 6371000, toR = x => x * Math.PI / 180;
@@ -483,7 +523,7 @@ const svg = k => `<svg viewBox="0 0 24 24" aria-hidden="true">${ICON[k]}</svg>`;
 /* ---------- state ---------- */
 let S = null;       // current place
 let token = 0;      // guards against stale responses
-let map, layers = {}, markerIndex = {}, centerLayer;
+let map, layers = {}, markerIndex = {}, centerLayer, currentBase;
 
 const LAYERS = [
   { key: "trails", label: "Trails", color: "--trail", icon: "boot" },
@@ -508,7 +548,8 @@ function initMap() {
   const topo = L.tileLayer("https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png", { maxZoom: 17, attribution: "© OpenStreetMap contributors, SRTM | © OpenTopoMap (CC-BY-SA)" });
   const sat = L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", { maxZoom: 19, attribution: "Imagery © Esri" });
   const hike = L.tileLayer("https://tile.waymarkedtrails.org/hiking/{z}/{x}/{y}.png", { maxZoom: 18, attribution: "© waymarkedtrails.org" });
-  topo.addTo(map);
+  topo.addTo(map); currentBase = topo;
+  map.on("baselayerchange", e => { currentBase = e.layer; });
   L.control.layers({ "Terrain": topo, "Street map": osm, "Satellite": sat }, { "Marked hiking routes (overlay)": hike }).addTo(map);
   L.control.scale({ imperial: false }).addTo(map);
   const tg = $("#toggles");
@@ -637,6 +678,9 @@ function renderRecent() {
 const RETRY = {};
 function loadPlace(p) {
   S = { ...p, radius: +$("#radius").value * 1000 };
+  RECORD = new Map();
+  ACTIVE_PACK = packMeta(packId(p)) ? packs.get(packId(p)).catch(() => null) : null;
+  showPackState();
   S.qid = new Promise(res => { S.setQid = res; setTimeout(() => res(p.wikidata || null), 45000); });
   const my = ++token;
   stopSound();
@@ -1235,6 +1279,7 @@ document.addEventListener("click", async e => {
 
 /* ---------- climate (Open-Meteo) ---------- */
 async function loadWeather(live) {
+  if (!navigator.onLine) return;
   try {
     const d = await getJSON(`https://api.open-meteo.com/v1/forecast?${qs({ latitude: S.lat, longitude: S.lon, current: "temperature_2m,weather_code,wind_speed_10m", timezone: "auto" })}`);
     if (!live()) return;
@@ -1580,6 +1625,114 @@ async function loadNearby(live) {
 
 
 
+
+/* ---------- offline packs ---------- */
+const packs = (() => {
+  let dbp;
+  const open = () => dbp ||= new Promise((res, rej) => {
+    const r = indexedDB.open("placelore", 1);
+    r.onupgradeneeded = () => r.result.createObjectStore("packs", { keyPath: "id" });
+    r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
+  });
+  const run = async (mode, fn) => { const db = await open(); return new Promise((res, rej) => { const t = db.transaction("packs", mode); const req = fn(t.objectStore("packs")); t.oncomplete = () => res(req.result); t.onerror = () => rej(t.error); }); };
+  return { get: id => run("readonly", st => st.get(id)), put: v => run("readwrite", st => st.put(v)), del: id => run("readwrite", st => st.delete(id)) };
+})();
+const packId = p => `${p.name.toLowerCase()}|${(+p.lat).toFixed(3)},${(+p.lon).toFixed(3)}`;
+// A small index in localStorage lists saved packs without opening IndexedDB
+const packIndex = () => store.get("placelore.packs", []);
+const packMeta = id => packIndex().find(x => x.id === id);
+const fmtDate = t => new Date(t).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+const fmtSize = b => b > 1e6 ? `${(b / 1e6).toFixed(1)} MB` : `${Math.max(1, Math.round(b / 1e3))} kB`;
+
+function showPackState() {
+  const meta = S && packMeta(packId(S));
+  const btn = $("#saveOffline");
+  btn.disabled = false;
+  btn.dataset.saved = !!meta;
+  btn.querySelector("span").textContent = meta ? "Update offline copy" : "Save for offline";
+  $("#saveStatus").textContent = meta ? `Saved ${fmtDate(meta.savedAt)} · ${meta.radius / 1000} km · ${fmtSize(meta.bytes)}` : "";
+  const pill = $("#offlinePill");
+  pill.hidden = navigator.onLine;
+  pill.textContent = meta ? `Offline · showing your copy from ${fmtDate(meta.savedAt)}` : "Offline · this place isn't saved";
+  if (!navigator.onLine && meta && +$("#radius").value * 1000 !== meta.radius) pill.textContent += ` (saved at ${meta.radius / 1000} km)`;
+}
+window.addEventListener("online", () => S && showPackState());
+window.addEventListener("offline", () => S && showPackState());
+
+function renderPacks() {
+  const list = packIndex();
+  $("#packs").hidden = !list.length;
+  $("#packList").innerHTML = list.map(m => `<li><span class="ic" style="background:var(--pine)">${svg("peak")}</span><div class="body"><div class="name"><button type="button" class="del" style="color:var(--ink);text-decoration:none;font-weight:600" data-open="${esc(m.id)}">${esc(m.name)}</button></div><div class="sub">${esc([m.region, `${m.radius / 1000} km`, `saved ${fmtDate(m.savedAt)}`, fmtSize(m.bytes)].filter(Boolean).join(" · "))}</div><div class="acts"><button type="button" data-open="${esc(m.id)}">Open</button><button type="button" data-del="${esc(m.id)}">Delete</button></div></div></li>`).join("");
+  $("#packList").querySelectorAll("[data-open]").forEach(b => b.addEventListener("click", () => openPack(b.dataset.open)));
+  $("#packList").querySelectorAll("[data-del]").forEach(b => b.addEventListener("click", async () => {
+    const m = packMeta(b.dataset.del); if (!m) return;
+    if (b.dataset.confirm !== "1") { b.dataset.confirm = "1"; b.textContent = `Delete ${m.name}?`; return; }
+    try { await packs.del(m.id); } catch {}
+    store.set("placelore.packs", packIndex().filter(x => x.id !== m.id)); renderPacks();
+  }));
+}
+function openPack(id) {
+  const m = packMeta(id); if (!m) return;
+  $("#radius").value = String(m.radius / 1000);  // saved answers match the radius they were saved at
+  loadPlace(m.place);
+}
+
+// Map tiles for the saved area, on the base map currently shown, a few zoom levels deep
+function tileUrls() {
+  if (!currentBase?._url) return [];
+  const R = S.radius, dLat = R / 111320, dLon = R / (111320 * Math.cos(S.lat * Math.PI / 180));
+  const tx = (lon, z) => Math.floor((lon + 180) / 360 * 2 ** z);
+  const ty = (lat, z) => { const r = lat * Math.PI / 180; return Math.floor((1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2 * 2 ** z); };
+  const subs = currentBase.options.subdomains || "abc", urls = [];
+  const maxZ = Math.min(R <= 5000 ? 15 : 14, currentBase.options.maxZoom || 18);
+  for (let z = 10; z <= maxZ; z++) {
+    for (let x = tx(S.lon - dLon, z); x <= tx(S.lon + dLon, z); x++)
+      for (let y = ty(S.lat + dLat, z); y <= ty(S.lat - dLat, z); y++)
+        urls.push(String(currentBase._url).replace(/\{(\w+)\}/g, (m, k) => ({ s: subs[(x + y) % subs.length], x, y, z, r: "" })[k] ?? ""));
+  }
+  return urls.slice(0, 400);  // tile servers ask apps not to bulk-download
+}
+async function fetchAll(urls, label) {
+  let done = 0;
+  const queue = [...urls];
+  const worker = async () => { for (let u; (u = queue.shift());) { try { await fetch(u, { mode: "no-cors" }); } catch {} done++; if (done % 5 === 0 || done === urls.length) $("#saveStatus").textContent = `${label} ${done} of ${urls.length}…`; } };
+  await Promise.all([1, 2, 3, 4].map(worker));
+}
+
+$("#saveOffline").addEventListener("click", async () => {
+  if (!navigator.onLine) { $("#saveStatus").textContent = "Connect to the internet to save this place."; return; }
+  const place = S, btn = $("#saveOffline");
+  btn.disabled = true;
+  try {
+    $("#saveStatus").textContent = "Waiting for every section to finish loading…";
+    await Promise.allSettled(Object.values(natureCache));
+    await whenIdle(90000);
+    if (place !== S) return;
+    const responses = Object.fromEntries(RECORD);
+    const bytes = new Blob([JSON.stringify(responses)]).size;
+    const keep = { name: S.name, region: S.region, lat: S.lat, lon: S.lon, kind: S.kind, wikidata: S.wikidata, wikipedia: S.wikipedia, country: S.country };
+    const id = packId(S), meta = { id, name: S.name, region: S.region, radius: S.radius, savedAt: Date.now(), bytes, place: keep };
+    await packs.put({ id, responses, savedAt: meta.savedAt });
+    store.set("placelore.packs", [meta, ...packIndex().filter(x => x.id !== id)]);
+    ACTIVE_PACK = Promise.resolve({ responses });
+    // Map tiles and photos go into the service worker's caches
+    if ("serviceWorker" in navigator && navigator.serviceWorker.controller) {
+      await fetchAll(tileUrls(), "Saving map tiles");
+      const photos = new Set([...document.querySelectorAll("#app img")].map(i => i.src).filter(u => u.startsWith("https://")));
+      for (const res of await Promise.all(Object.values(natureCache).map(p => p.catch(() => []))))
+        for (const r of res) { const u = r.taxon?.default_photo?.medium_url; if (u) photos.add(u); }
+      await fetchAll([...photos], "Saving photos");
+    }
+    if (place === S) showPackState();
+    if (!navigator.serviceWorker?.controller) $("#saveStatus").textContent += " · The map and photos need one reload of the app before they can be saved too.";
+  } catch (err) {
+    $("#saveStatus").textContent = `Couldn't save: ${err.message}. Your phone may be out of storage, or private browsing may block saving.`;
+    btn.disabled = false;
+  }
+});
+
+if ("serviceWorker" in navigator && location.protocol.startsWith("http")) navigator.serviceWorker.register("/sw.js").catch(() => {});
+
 /* ---------- choose which sections to show ---------- */
 const SECTIONS = [
   { id: "s-overview", label: "Overview" },
@@ -1669,7 +1822,7 @@ function renderChat() {
   const log = $("#chatLog");
   if (!chatMsgs.length) {
     const ideas = [`What's the story of ${S.name} in a nutshell?`, "Where can we walk this afternoon?", "Which birds should we look out for?", "Where can we stay on a farm?", "Is there something fun for kids?"];
-    log.innerHTML = `<div class="msg note">Ask me anything about ${esc(S.name)}. I answer from the information on this page, and tell you when it doesn't cover something.</div><div class="hint">${ideas.map(q => `<button type="button">${esc(q)}</button>`).join("")}</div>`;
+    log.innerHTML = `<div class="msg note">${navigator.onLine ? "" : "You're offline. The assistant needs a connection, but everything saved on this page still works.<br><br>"}Ask me anything about ${esc(S.name)}. I answer from the information on this page, and tell you when it doesn't cover something.</div><div class="hint">${ideas.map(q => `<button type="button">${esc(q)}</button>`).join("")}</div>`;
     log.querySelectorAll(".hint button").forEach(b => b.addEventListener("click", () => sendChat(b.textContent)));
     return;
   }
@@ -1732,6 +1885,7 @@ window.addEventListener("resize", setHdr); setHdr();
 
 /* ---------- boot ---------- */
 renderRecent();
+renderPacks();
 (function boot() {
   const u = new URLSearchParams(location.search);
   const lat = parseFloat(u.get("lat")), lon = parseFloat(u.get("lon")), q = u.get("q");
