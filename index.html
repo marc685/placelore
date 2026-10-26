@@ -458,7 +458,7 @@ const WP = `https://${LANG}.wikipedia.org/w/api.php`;
    when the network fails, the saved pack answers instead. */
 let RECORD = new Map(), ACTIVE_PACK = null, inflight = 0;
 const idleWaiters = [];
-const reqKey = (url, opts) => (url.includes("/api/interpreter") ? "overpass" : url) + "|" + (opts.body || "");
+const reqKey = (url, opts) => (/\/api\/(interpreter|overpass)/.test(url) ? "overpass" : url.replace(/^https:\/\/query\.wikidata\.org\/sparql|^\/api\/sparql/, "sparql")) + "|" + (opts.body || "");
 const recordable = url => !/nominatim\.openstreetmap\.org\/search|api\.open-meteo\.com\/v1\/forecast/.test(url);
 async function getJSON(url, opts = {}, ms = 30000) {
   const key = reqKey(url, opts);
@@ -467,7 +467,7 @@ async function getJSON(url, opts = {}, ms = 30000) {
   inflight++;
   const c = new AbortController(); const t = setTimeout(() => c.abort(), ms);
   try {
-    const r = await fetch(url, { ...opts, signal: c.signal }); if (!r.ok) throw new Error(r.status === 429 ? "the server is busy" : `${r.status} ${r.statusText}`);
+    const r = await fetch(url, { ...opts, signal: c.signal }); if (!r.ok) throw Object.assign(new Error(r.status === 429 ? "the server is busy" : r.status === 502 ? "the map and data servers are busy right now" : `${r.status} ${r.statusText}`), { status: r.status });
     const data = await r.json();
     if (recordable(url)) RECORD.set(key, data);
     return data;
@@ -931,6 +931,11 @@ async function overpass(q) {
   const start = overpassCalls++;
   try {
     let last;
+    // The app's own server relays with retries and a cache; the public servers directly are the fallback
+    if (location.protocol.startsWith("http")) {
+      try { return await getJSON("/api/overpass", { method: "POST", body: "data=" + encodeURIComponent(q), headers: { "Content-Type": "application/x-www-form-urlencoded" } }, 200000); }
+      catch (e) { last = e; if (!navigator.onLine || [429, 502].includes(e.status)) throw e; } // the server already tried every mirror
+    }
     for (let k = 0; k < OVERPASS.length; k++) {
       const url = OVERPASS[(start + k) % OVERPASS.length];
       try { return await getJSON(url, { method: "POST", body: "data=" + encodeURIComponent(q), headers: { "Content-Type": "application/x-www-form-urlencoded" } }, 50000); }
@@ -1580,7 +1585,12 @@ async function loadPeople(live) {
   ?p wikibase:sitelinks ?links .
   SERVICE wikibase:label { bd:serviceParam wikibase:language "${LANG}" . }
 } ORDER BY DESC(?links) LIMIT 120`;
-  const sparql = (q, ms) => getJSON(`https://query.wikidata.org/sparql?${qs({ format: "json", query: q })}`, { headers: { Accept: "application/sparql-results+json" } }, ms);
+  const sparql = async (q, ms) => {
+    if (location.protocol.startsWith("http")) {
+      try { return await getJSON(`/api/sparql?${qs({ format: "json", query: q })}`, {}, 80000); } catch (e) { if (!navigator.onLine || [429, 502].includes(e.status)) throw e; }
+    }
+    return getJSON(`https://query.wikidata.org/sparql?${qs({ format: "json", query: q })}`, { headers: { Accept: "application/sparql-results+json" } }, ms);
+  };
   try {
     let d, scope = `within ${r} km`;
     try {

@@ -1,6 +1,6 @@
-// Placelore server: serves the app and streams answers for "Ask about this place".
-// The browser sends a text summary of the data it has already loaded, so the
-// server does no data fetching of its own.
+// Placelore server: serves the app, streams answers for "Ask about this place",
+// and relays OpenStreetMap (Overpass) and Wikidata queries with retries and a cache,
+// because those public servers often reject or time out busy browsers.
 import http from "node:http";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
@@ -114,6 +114,64 @@ async function chat(req, res) {
   }
 }
 
+
+/* ---------- Overpass and Wikidata relay ---------- */
+const OVERPASS = ["https://overpass-api.de/api/interpreter", "https://overpass.kumi.systems/api/interpreter", "https://overpass.private.coffee/api/interpreter"];
+const UA = "Placelore/1.0 (https://github.com/marc685/placelore)";
+const cache = new Map(); // key -> { at, body }
+const CACHE_MS = 6 * 3600_000, CACHE_MAX = 300;
+function cached(key) { const hit = cache.get(key); if (hit && Date.now() - hit.at < CACHE_MS) return hit.body; cache.delete(key); }
+function remember(key, body) { cache.set(key, { at: Date.now(), body }); if (cache.size > CACHE_MAX) cache.delete(cache.keys().next().value); }
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+async function tryFetch(url, init, ms) {
+  const c = new AbortController(), t = setTimeout(() => c.abort(), ms);
+  try {
+    const r = await fetch(url, { ...init, signal: c.signal });
+    const text = await r.text();
+    if (!r.ok) throw Object.assign(new Error(`${r.status}`), { status: r.status });
+    JSON.parse(text); // Overpass sometimes answers 200 with an HTML error page
+    return text;
+  } finally { clearTimeout(t); }
+}
+const relayHits = new Map();
+function relayLimited(ip) {
+  const now = Date.now(), recent = (relayHits.get(ip) || []).filter(t => now - t < 600_000);
+  recent.push(now); relayHits.set(ip, recent); if (relayHits.size > 5000) relayHits.clear();
+  return recent.length > 120;
+}
+async function relay(req, res, kind) {
+  const ip = (req.headers["x-forwarded-for"] || req.socket.remoteAddress || "").split(",")[0].trim();
+  const send = (code, body) => { res.writeHead(code, { "Content-Type": "application/json", "Cache-Control": code === 200 ? "public, max-age=3600" : "no-store" }); res.end(body); };
+  if (relayLimited(ip)) return send(429, JSON.stringify({ error: "too many requests" }));
+  let key, attempts;
+  if (kind === "overpass") {
+    if (req.method !== "POST") return send(405, "{}");
+    const body = await readBody(req);
+    if (body.length > 20_000 || !body.startsWith("data=")) return send(400, JSON.stringify({ error: "bad query" }));
+    key = "o:" + body;
+    const init = { method: "POST", body, headers: { "Content-Type": "application/x-www-form-urlencoded", "User-Agent": UA } };
+    attempts = OVERPASS.map(u => () => tryFetch(u, init, 60_000));
+  } else {
+    const q = new URL(req.url, "http://x").searchParams.get("query") || "";
+    if (!q || q.length > 8000) return send(400, JSON.stringify({ error: "bad query" }));
+    key = "w:" + q;
+    const url = "https://query.wikidata.org/sparql?" + new URLSearchParams({ format: "json", query: q });
+    const init = { headers: { Accept: "application/sparql-results+json", "User-Agent": UA } };
+    attempts = [() => tryFetch(url, init, 65_000)]; // Wikidata's own limit is 60 s; the browser falls back to a quicker query
+  }
+  const hit = cached(key); if (hit) return send(200, hit);
+  let last;
+  for (let round = 0; round < (kind === "overpass" ? 2 : 1); round++) {
+    if (round) await sleep(4000);
+    for (const attempt of attempts) {
+      try { const body = await attempt(); remember(key, body); return send(200, body); }
+      catch (e) { last = e; }
+    }
+  }
+  console.error(`${kind} relay failed`, last?.status || last?.name || last?.message);
+  send(502, JSON.stringify({ error: last?.name === "AbortError" ? "timeout" : "upstream " + (last?.status || "error") }));
+}
+
 const TYPES = { ".html": "text/html; charset=utf-8", ".js": "text/javascript", ".css": "text/css", ".json": "application/json", ".webmanifest": "application/manifest+json", ".png": "image/png", ".svg": "image/svg+xml" };
 async function serveStatic(req, res) {
   const url = new URL(req.url, "http://x");
@@ -133,6 +191,8 @@ http.createServer((req, res) => {
     if (req.method !== "POST") { res.writeHead(405); return res.end(); }
     return chat(req, res).catch(err => { console.error(err); if (!res.headersSent) res.writeHead(500); res.end(); });
   }
+  if (req.url.startsWith("/api/overpass")) return relay(req, res, "overpass").catch(err => { console.error(err); if (!res.headersSent) res.writeHead(500); res.end(); });
+  if (req.url.startsWith("/api/sparql")) return relay(req, res, "sparql").catch(err => { console.error(err); if (!res.headersSent) res.writeHead(500); res.end(); });
   if (req.url === "/healthz") { res.writeHead(200); return res.end("ok"); }
   return serveStatic(req, res);
 }).listen(PORT, () => console.log(`Placelore listening on ${PORT}`));
