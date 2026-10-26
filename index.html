@@ -16,6 +16,7 @@
   --paper:#eef1ec; --surface:#ffffff; --ink:#1d2a24; --muted:#5b6b62; --line:#d3dbd4;
   --pine:#24553f; --pine-soft:#dbe8e0; --ochre:#a8761c; --river:#2f6f9a; --trail:#9b4a2a;
   --camp:#3d7d4f; --picnic:#b8862b; --farm:#7a5a2e; --peak:#5d4f7a; --hist:#8a3b3b; --wiki:#2f6f9a;
+  --stay:#7a3f6b; --fun:#1f6f78; --help:#b3261e;
   --display:"Zilla Slab",Georgia,"Times New Roman",serif;
   --body:"Source Sans 3",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
   --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
@@ -25,11 +26,13 @@
   --paper:#121815; --surface:#1a221e; --ink:#e4ebe6; --muted:#9aaba1; --line:#2c3832;
   --pine:#6cbf95; --pine-soft:#20352b; --ochre:#e0b357; --river:#6fb0dc; --trail:#e08a62;
   --camp:#74c08a; --picnic:#e0b357; --farm:#c99a5b; --peak:#a796d6; --hist:#e08484; --wiki:#6fb0dc;
+  --stay:#d293c2; --fun:#5cc0c8; --help:#f28b82;
   color-scheme:dark;}}
 :root[data-theme="dark"]{
   --paper:#121815; --surface:#1a221e; --ink:#e4ebe6; --muted:#9aaba1; --line:#2c3832;
   --pine:#6cbf95; --pine-soft:#20352b; --ochre:#e0b357; --river:#6fb0dc; --trail:#e08a62;
   --camp:#74c08a; --picnic:#e0b357; --farm:#c99a5b; --peak:#a796d6; --hist:#e08484; --wiki:#6fb0dc;
+  --stay:#d293c2; --fun:#5cc0c8; --help:#f28b82;
   color-scheme:dark;}
 *{box-sizing:border-box}
 html{padding:env(safe-area-inset-top,0px) 0 env(safe-area-inset-bottom,0px)}
@@ -157,6 +160,8 @@ ul.items .acts button{background:none;border:0;padding:0;color:var(--pine);font:
 .sp .sn{font-style:italic;color:var(--muted);font-size:.85rem}
 .sp .ft{display:flex;justify-content:space-between;gap:6px;font-size:.8rem;margin-top:auto;padding-top:4px}
 .sp .ft a{text-decoration:none}
+.hear{font:600 .8rem var(--body);margin-top:6px;padding:6px 8px;border-radius:8px;border:1px solid var(--line);background:var(--pine-soft);color:var(--ink);cursor:pointer;align-self:flex-start}
+.hear[aria-pressed="true"]{background:var(--pine);color:var(--surface);border-color:var(--pine)}
 .badge{font:500 .7rem var(--mono);text-transform:uppercase;letter-spacing:.05em;padding:1px 6px;border-radius:4px;background:var(--hist);color:var(--surface);align-self:flex-start}
 
 /* climate */
@@ -237,15 +242,18 @@ footer{padding-block:24px 40px;color:var(--muted);font-size:.85rem}
 
   <nav class="chapters" aria-label="Chapters"><div class="wrap">
     <a href="#s-overview">Overview</a>
+    <a href="#s-stay">Stay</a>
     <a href="#s-map">Map</a>
     <a href="#s-history">History</a>
-    <a href="#s-rivers">Rivers &amp; names</a>
     <a href="#s-outdoors">Trails &amp; camping</a>
     <a href="#s-nature">Wildlife &amp; birds</a>
     <a href="#s-climate">Climate</a>
-    <a href="#s-geology">Geology &amp; mountains</a>
+    <a href="#s-geology">Rivers, mountains &amp; geology</a>
     <a href="#s-farms">Farms</a>
+    <a href="#s-people">Famous people</a>
     <a href="#s-nearby">Nearby sights</a>
+    <a href="#s-help">Emergency &amp; help</a>
+    <a href="#s-fun">Food, fun &amp; recreation</a>
   </div></nav>
 
   <main class="wrap">
@@ -263,9 +271,16 @@ footer{padding-block:24px 40px;color:var(--muted);font-size:.85rem}
       <div class="links" id="ov-links"></div>
     </section>
 
+    <section id="s-stay">
+      <h2>Accommodation and farm stays</h2>
+      <p class="lede">Hotels, guest houses, self-catering, hostels and farm stays mapped within the search radius.</p>
+      <div id="stay"><p class="loading">Finding places to stay…</p></div>
+      <div class="callout"><div class="eyebrow">Before you book</div>Map listings can be out of date. Confirm prices, availability and directions with the place itself before you travel.</div>
+    </section>
+
     <section id="s-map">
       <h2>Map</h2>
-      <p class="lede">Trails, camp sites, picnic spots, farms, peaks, rivers, historic sites and encyclopaedia entries within the search radius. Switch layers to show or hide them, and use the layer button for terrain or satellite views.</p>
+      <p class="lede">Trails, camp sites, picnic spots, places to stay, farms, peaks, rivers, historic sites, recreation and encyclopaedia entries within the search radius. Switch layers to show or hide them, and use the layer button for terrain or satellite views.</p>
       <div class="toggles" id="toggles"></div>
       <div id="map" role="region" aria-label="Map of the area"></div>
       <p class="err" id="mapStatus" hidden></p>
@@ -289,12 +304,6 @@ footer{padding-block:24px 40px;color:var(--muted);font-size:.85rem}
       <div class="links" id="hist-links"></div>
     </section>
 
-    <section id="s-rivers">
-      <h2>Rivers and where their names come from</h2>
-      <p class="lede">Rivers and streams flowing through the area, with the origin of each name where one is recorded.</p>
-      <div id="rivers"><p class="loading">Tracing the waterways…</p></div>
-    </section>
-
     <section id="s-outdoors">
       <h2>Trails, camping and picnic spots</h2>
       <p class="lede">Walking routes and footpaths mapped by OpenStreetMap volunteers. Check local access rules and conditions before you set out.</p>
@@ -309,7 +318,7 @@ footer{padding-block:24px 40px;color:var(--muted);font-size:.85rem}
 
     <section id="s-nature">
       <h2>Wildlife and birds</h2>
-      <p class="lede">Species most often recorded within the search radius, from research-grade iNaturalist sightings.</p>
+      <p class="lede">Species most often recorded within the search radius, from research-grade iNaturalist sightings. Tap <b>Hear the call</b> to play a real recording.</p>
       <div id="nature-wiki"></div>
       <div class="tabs" role="tablist" id="natureTabs"></div>
       <div id="nature"><p class="loading">Looking for birds and animals…</p></div>
@@ -324,8 +333,10 @@ footer{padding-block:24px 40px;color:var(--muted);font-size:.85rem}
     </section>
 
     <section id="s-geology">
-      <h2>Geology and mountains</h2>
-      <p class="lede">The rocks under your feet and the peaks around you.</p>
+      <h2>Rivers, mountains and geology</h2>
+      <p class="lede">The rivers that shape the land and where their names come from, the rocks under your feet, and the peaks around you.</p>
+      <h3>Rivers and their names</h3>
+      <div id="rivers"><p class="loading">Tracing the waterways…</p></div>
       <div id="geo-wiki"></div>
       <h3>Rock units at this spot</h3>
       <div id="geology"><p class="loading">Reading the geological map…</p></div>
@@ -342,13 +353,34 @@ footer{padding-block:24px 40px;color:var(--muted);font-size:.85rem}
       <div id="farms"><p class="loading">Finding farms…</p></div>
     </section>
 
+    <section id="s-people">
+      <h2>Famous people</h2>
+      <p class="lede">People with an encyclopaedia entry who were born, died or are buried in or near this place.</p>
+      <div id="people"><p class="loading">Looking up notable people…</p></div>
+      <div id="people-wiki"></div>
+    </section>
+
     <section id="s-nearby">
       <h2>Nearby sights with a story</h2>
       <p class="lede">Encyclopaedia entries about places within 10 km, nearest first.</p>
       <div id="nearby"><p class="loading">Looking for nearby articles…</p></div>
     </section>
+
+    <section id="s-help">
+      <h2>Emergency and help</h2>
+      <div id="help-numbers"><p class="loading">Checking which country you're in…</p></div>
+      <div id="help-places"></div>
+      <div class="links" id="help-links"></div>
+    </section>
+
+    <section id="s-fun">
+      <h2>Food, fun and recreation</h2>
+      <p class="lede">Restaurants, nightlife, things for kids, sport and 4×4 trails within the search radius, nearest first.</p>
+      <div id="fun"><p class="loading">Finding things to do…</p></div>
+      <div class="callout"><div class="eyebrow">Before you go</div>Local listings may be incomplete. Confirm opening times, bookings and access with the venue.</div>
+    </section>
   </main>
-  <footer class="wrap">Data: © OpenStreetMap contributors, Wikipedia &amp; Wikidata (CC BY-SA), iNaturalist, Open-Meteo, Macrostrat. Map data can be incomplete; trails and access may change.</footer>
+  <footer class="wrap">Data: © OpenStreetMap contributors, Wikipedia &amp; Wikidata (CC BY-SA), iNaturalist, Open-Meteo, Macrostrat, OpenTopoMap, Esri. Map data can be incomplete; trails and access may change.</footer>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
@@ -393,7 +425,10 @@ const ICON = {
   eye: '<path d="M12 5C6 5 2 12 2 12s4 7 10 7 10-7 10-7-4-7-10-7zm0 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8z"/>',
   boot: '<path d="M6 2h6v8l7 4c1.5.8 2 2 2 3.5V20H3V2zm-1 19h17v2H5z"/>',
   wave: '<path d="M2 10c3-3 5-3 8 0s5 3 8 0l4 0v3c-3 3-5 3-8 0s-5-3-8 0H2zm0 6c3-3 5-3 8 0s5 3 8 0h4v3c-3 3-5 3-8 0s-5-3-8 0H2z"/>',
-  leaf: '<path d="M20 3C9 3 4 9 4 16c0 1.5.3 3 1 4l1.5-1.5C8 12 12 9 16 8c-4 2-7 6-8 11 7 0 12-5 12-16z"/>'
+  leaf: '<path d="M20 3C9 3 4 9 4 16c0 1.5.3 3 1 4l1.5-1.5C8 12 12 9 16 8c-4 2-7 6-8 11 7 0 12-5 12-16z"/>',
+  bed: '<path d="M2 5h2.5v8H11V8h7a4 4 0 0 1 4 4v8h-2.5v-3h-15v3H2zM7.5 7.5a2.3 2.3 0 1 1 0 4.6 2.3 2.3 0 0 1 0-4.6z"/>',
+  ball: '<path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 2.5 2.6 1.9-1 3.1h-3.2l-1-3.1zm-6.4 4.3 3.1 1 1 3.1-1.9 2.6-3.2-.1a7.5 7.5 0 0 1 1-6.6zm12.8 0a7.5 7.5 0 0 1 1 6.6l-3.2.1-1.9-2.6 1-3.1z"/>',
+  cross: '<path d="M9 2h6v7h7v6h-7v7H9v-7H2V9h7z"/>'
 };
 const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
 const svg = k => `<svg viewBox="0 0 24 24" aria-hidden="true">${ICON[k]}</svg>`;
@@ -412,7 +447,10 @@ const LAYERS = [
   { key: "river", label: "Rivers", color: "--river", icon: "wave" },
   { key: "hist", label: "Historic", color: "--hist", icon: "hist" },
   { key: "view", label: "Viewpoints & reserves", color: "--ochre", icon: "eye" },
-  { key: "wiki", label: "Encyclopaedia", color: "--wiki", icon: "book" }
+  { key: "wiki", label: "Encyclopaedia", color: "--wiki", icon: "book" },
+  { key: "stay", label: "Stays", color: "--stay", icon: "bed" },
+  { key: "fun", label: "Recreation", color: "--fun", icon: "ball" },
+  { key: "help", label: "Help & fuel", color: "--help", icon: "cross" }
 ];
 
 /* ---------- map ---------- */
@@ -548,6 +586,7 @@ const RETRY = {};
 function loadPlace(p) {
   S = { ...p, radius: +$("#radius").value * 1000 };
   const my = ++token;
+  stopSound();
   const live = () => my === token;
   $("#welcome").hidden = true; $("#app").hidden = false;
   document.title = `${p.name} · Placelore`;
@@ -558,14 +597,14 @@ function loadPlace(p) {
   $("#placeElev").textContent = ""; $("#weatherNow").hidden = true;
   document.querySelectorAll("#app .err").forEach(e => e.remove());
   const rec = store.get("placelore.recent", []).filter(x => x.name !== p.name);
-  rec.unshift({ name: p.name, region: p.region, lat: p.lat, lon: p.lon, kind: p.kind, wikidata: p.wikidata, wikipedia: p.wikipedia });
+  rec.unshift({ name: p.name, region: p.region, lat: p.lat, lon: p.lon, kind: p.kind, wikidata: p.wikidata, wikipedia: p.wikipedia, country: p.country });
   store.set("placelore.recent", rec.slice(0, 8));
   try { history.replaceState(null, "", `?q=${encodeURIComponent(p.name)}&lat=${p.lat.toFixed(5)}&lon=${p.lon.toFixed(5)}`); } catch {}
 
   // reset UI
-  const reset = { "#ov-intro": "Finding the encyclopaedia entry…", "#ov-facts": "Gathering facts…", "#hist-wiki": "Reading the history…", "#hist-sites": "Searching the map…", "#rivers": "Tracing the waterways…", "#trails": "Loading trails…", "#camping": "Loading camp sites…", "#picnic": "Loading picnic spots…", "#views": "Loading…", "#nature": "Looking for birds and animals…", "#climate": "Crunching ten years of weather…", "#geology": "Reading the geological map…", "#peaks": "Finding peaks…", "#farms": "Finding farms…", "#nearby": "Looking for nearby articles…" };
+  const reset = { "#ov-intro": "Finding the encyclopaedia entry…", "#ov-facts": "Gathering facts…", "#hist-wiki": "Reading the history…", "#hist-sites": "Searching the map…", "#rivers": "Tracing the waterways…", "#trails": "Loading trails…", "#camping": "Loading camp sites…", "#picnic": "Loading picnic spots…", "#views": "Loading…", "#nature": "Looking for birds and animals…", "#climate": "Crunching ten years of weather…", "#geology": "Reading the geological map…", "#peaks": "Finding peaks…", "#farms": "Finding farms…", "#nearby": "Looking for nearby articles…", "#stay": "Finding places to stay…", "#people": "Looking up notable people…", "#help-numbers": "Checking which country you're in…", "#fun": "Finding things to do…" };
   for (const [k, v] of Object.entries(reset)) $(k).innerHTML = loading(v);
-  for (const k of ["#ov-name", "#hist-deep", "#nature-wiki", "#climate-wiki", "#geo-wiki", "#farm-wiki", "#landuse"]) $(k).innerHTML = "";
+  for (const k of ["#ov-name", "#hist-deep", "#nature-wiki", "#climate-wiki", "#geo-wiki", "#farm-wiki", "#landuse", "#people-wiki", "#help-places"]) $(k).innerHTML = "";
   for (const k of ["#c-trails", "#c-camp", "#c-picnic", "#c-view", "#c-peaks"]) $(k).textContent = "";
   $("#factbox").innerHTML = `<dl><dt>Loading</dt><dd>…</dd></dl>`;
   setLinks();
@@ -585,6 +624,9 @@ function loadPlace(p) {
   (RETRY.climate = () => loadClimate(live))();
   (RETRY.geo = () => loadGeology(live))();
   (RETRY.nearby = () => loadNearby(live))();
+  (RETRY.extra = () => loadExtra(live))();
+  (RETRY.people = () => loadPeople(live))();
+  loadHelp(live);
   loadWeather(live);
 }
 
@@ -630,14 +672,15 @@ function setLinks(title) {
 }
 
 /* ---------- Wikipedia: main article ---------- */
-const SKIP = /^(see also|references|external links|notes|further reading|bibliography|sources|gallery|citations|footnotes|twin towns|sister cities|notable (people|residents)|literature|verwysings|eksterne skakels)/i;
+const SKIP = /^(see also|references|external links|notes|further reading|bibliography|sources|gallery|citations|footnotes|twin towns|sister cities|literature|verwysings|eksterne skakels)/i;
 const CAT = {
   history: /histor|geskied|geschied|geschicht|colonial|settlement|founding|prehistor|archaeolog/i,
   name: /etymolog|^name|naming|toponym|naam|origin of the name/i,
   geo: /geolog|geograph|topograph|landscape|mountain|terrain|landform|physical/i,
   climate: /climate|klimaat|klima|weather/i,
   nature: /flora|fauna|wildlife|ecolog|natur|environment|biodivers|vegetation|birds/i,
-  farm: /econom|agricult|farm|wine|viticult|industr|landbou|wirtschaft|produce|fruit/i
+  farm: /econom|agricult|farm|wine|viticult|industr|landbou|wirtschaft|produce|fruit/i,
+  people: /notable (people|residents|persons|individuals)|famous (people|residents)|personalities|bekende (persone|inwoners)/i
 };
 function parseSections(text) {
   const out = []; const re = /\n*(={2,6})\s*(.+?)\s*\1\n/g; let last = 0, m, cur = { level: 1, title: "Intro", text: "" };
@@ -761,6 +804,7 @@ async function loadWiki(live) {
     put("#climate-wiki", "climate", "Climate in words");
     put("#nature-wiki", "nature", "Natural environment");
     put("#farm-wiki", "farm", "Economy and agriculture");
+    put("#people-wiki", "people", "Notable people");
   } catch (err) {
     if (!live()) return;
     $("#ov-intro").innerHTML = errHTML(`Could not load the encyclopaedia article (${err.message}).`, "wiki");
@@ -793,7 +837,7 @@ const OVERPASS = ["https://overpass-api.de/api/interpreter", "https://overpass.k
 async function overpass(q) {
   let last;
   for (const url of OVERPASS) {
-    try { return await getJSON(url, { method: "POST", body: "data=" + encodeURIComponent(q), headers: { "Content-Type": "application/x-www-form-urlencoded" } }, 90000); }
+    try { return await getJSON(url, { method: "POST", body: "data=" + encodeURIComponent(q), headers: { "Content-Type": "application/x-www-form-urlencoded" } }, 30000); }
     catch (e) { last = e; }
   }
   throw last;
@@ -813,7 +857,7 @@ const center = el => el.center ? el.center : (el.lat != null ? { lat: el.lat, lo
 async function loadOSM(live) {
   const R = S.radius, Rt = Math.min(R, 12000), a = `(around:${R},${S.lat},${S.lon})`, at = `(around:${Rt},${S.lat},${S.lon})`;
   const bb = bbox(S.lat, S.lon, R * 1.05);
-  const qLines = `[out:json][timeout:80];
+  const qLines = `[out:json][timeout:25];
 (
   relation["route"~"^(hiking|foot|walking)$"]${a};
   way["highway"~"^(path|bridleway)$"]${at};
@@ -821,7 +865,7 @@ async function loadOSM(live) {
   way["waterway"~"^(river|stream|canal)$"]["name"]${a};
 );
 out tags geom(${bb}) qt;`;
-  const qPoi = `[out:json][timeout:80];
+  const qPoi = `[out:json][timeout:25];
 (
   nwr["tourism"~"^(camp_site|caravan_site|picnic_site|viewpoint|wine_cellar|alpine_hut|wilderness_hut)$"]${a};
   nwr["leisure"="picnic_site"]${a};
@@ -967,7 +1011,7 @@ function renderPOIs(els) {
     }
   }
   const byDist = (a, b) => a.dist - b.dist;
-  const put = (sel, cnt, arr, key, emptyMsg, sort = byDist) => { arr.sort(sort); $(cnt).textContent = arr.length || ""; $(sel).innerHTML = itemsList(arr, key) || `<p class="empty">${emptyMsg}</p>`; };
+  const put = (sel, cnt, arr, key, emptyMsg, sort = byDist) => { arr.sort(sort); if (cnt) $(cnt).textContent = arr.length || ""; $(sel).innerHTML = itemsList(arr, key) || `<p class="empty">${emptyMsg}</p>`; };
   put("#camping", "#c-camp", camp, "camp", `No camp sites mapped within ${S.radius / 1000} km. Try a bigger radius.`);
   put("#picnic", "#c-picnic", picnic, "picnic", "No picnic sites mapped nearby.");
   put("#views", "#c-view", views, "view", "No viewpoints or reserves mapped nearby.");
@@ -1054,9 +1098,12 @@ function renderRivers(list) {
 
 /* ---------- nature (iNaturalist) ---------- */
 const GROUPS = [
-  { key: "birds", label: "Birds", p: { iconic_taxa: "Aves" }, n: 30 },
-  { key: "mammals", label: "Mammals", p: { iconic_taxa: "Mammalia" }, n: 24 },
-  { key: "reptiles", label: "Reptiles & frogs", p: { iconic_taxa: "Reptilia,Amphibia" }, n: 24 },
+  { key: "birds", label: "Birds", p: { iconic_taxa: "Aves" }, n: 30, sound: true },
+  { key: "mammals", label: "Mammals", p: { iconic_taxa: "Mammalia" }, n: 24, sound: true },
+  { key: "reptiles", label: "Reptiles", p: { iconic_taxa: "Reptilia" }, n: 24 },
+  { key: "frogs", label: "Frogs & toads", p: { iconic_taxa: "Amphibia" }, n: 18, sound: true },
+  { key: "insects", label: "Insects", p: { iconic_taxa: "Insecta", without_taxon_id: 47157 }, n: 24, sound: true },
+  { key: "spiders", label: "Spiders & scorpions", p: { iconic_taxa: "Arachnida" }, n: 18 },
   { key: "butterflies", label: "Butterflies & moths", p: { taxon_id: 47157 }, n: 24 },
   { key: "plants", label: "Wildflowers & plants", p: { iconic_taxa: "Plantae" }, n: 30 },
   { key: "fish", label: "Fish", p: { iconic_taxa: "Actinopterygii" }, n: 18 }
@@ -1088,10 +1135,48 @@ async function showGroup(key, live) {
       const cs = t.conservation_status?.status_name || (t.threatened ? "threatened" : "");
       return `<article class="sp">${img ? `<img src="${esc(img)}" alt="${esc(t.preferred_common_name || t.name)}" loading="lazy">` : `<div style="aspect-ratio:1;background:var(--line)"></div>`}
         <div class="t">${cs ? `<span class="badge">${esc(cs)}</span>` : ""}<span class="cn">${esc(t.preferred_common_name || t.name)}</span><span class="sn">${esc(t.name)}</span>
+        ${g.sound ? `<button type="button" class="hear" data-taxon="${t.id}">Hear the call</button>` : ""}
         <div class="ft"><span class="num">${r.count} sightings</span><span><a href="https://www.inaturalist.org/taxa/${t.id}" target="_blank" rel="noopener">iNat</a>${t.wikipedia_url ? ` · <a href="${esc(t.wikipedia_url)}" target="_blank" rel="noopener">Wiki</a>` : ""}</span></div></div></article>`;
     }).join("")}</div>`;
   } catch (err) { if (live()) $("#nature").innerHTML = errHTML(`Wildlife data did not load (${err.message}).`, "nature"); }
 }
+
+/* Real recordings from iNaturalist: near the place first, then the rest of South Africa, then anywhere */
+let player = null, playingBtn = null;
+const soundCache = {};
+async function findSound(taxonId) {
+  if (taxonId in soundCache) return soundCache[taxonId];
+  const base = { taxon_id: taxonId, sounds: "true", per_page: 3, order_by: "votes", quality_grade: "research" };
+  const tries = [{ ...base, lat: S.lat, lng: S.lon, radius: 100 }, { ...base, place_id: 6986 }, base];
+  for (const p of tries) {
+    try {
+      const d = await getJSON(`https://api.inaturalist.org/v1/observations?${qs(p)}`);
+      for (const o of d.results || []) {
+        const snd = (o.sounds || []).find(x => x.file_url);
+        if (snd) return (soundCache[taxonId] = { url: snd.file_url, where: o.place_guess || "", by: snd.attribution || "", obs: o.id });
+      }
+    } catch {}
+  }
+  return (soundCache[taxonId] = null);
+}
+function stopSound() {
+  if (player) { player.pause(); player = null; }
+  if (playingBtn) { playingBtn.textContent = "Hear the call"; playingBtn.removeAttribute("aria-pressed"); playingBtn = null; }
+}
+document.addEventListener("click", async e => {
+  const b = e.target.closest(".hear"); if (!b) return;
+  if (playingBtn === b) { stopSound(); return; }
+  stopSound();
+  b.textContent = "Finding a recording…"; b.disabled = true;
+  const snd = await findSound(b.dataset.taxon);
+  b.disabled = false;
+  if (!snd) { b.textContent = "No recording found"; return; }
+  player = new Audio(snd.url); playingBtn = b;
+  b.textContent = "Stop"; b.setAttribute("aria-pressed", "true");
+  b.title = [snd.where && "Recorded at " + snd.where, snd.by].filter(Boolean).join(" · ");
+  player.addEventListener("ended", stopSound);
+  player.play().catch(() => { stopSound(); b.textContent = "Couldn't play this recording"; });
+});
 
 /* ---------- climate (Open-Meteo) ---------- */
 async function loadWeather(live) {
@@ -1221,6 +1306,194 @@ async function loadGeology(live) {
       ${u.comments ? `<p style="margin:6px 0 0;color:var(--muted)">${esc(u.comments)}</p>` : ""}
       ${u.strat ? `<div class="links" style="margin-top:8px">${linkBtns([["Read about the " + u.strat, `https://${LANG}.wikipedia.org/w/index.php?search=${encodeURIComponent(u.strat)}`]])}</div>` : ""}</div>`).join("");
   } catch (err) { if (live()) $("#geology").innerHTML = errHTML(`The geological map did not load (${err.message}).`, "geo"); }
+}
+
+/* ---------- accommodation, recreation and help (one Overpass query) ---------- */
+const STAY_GROUPS = [
+  { k: "farm", label: "Farm stays", search: "farm stay" },
+  { k: "guest", label: "Guest houses & B&Bs", search: "guest house" },
+  { k: "hotel", label: "Hotels & motels", search: "hotel" },
+  { k: "self", label: "Self-catering & chalets", search: "self catering" },
+  { k: "hostel", label: "Hostels & backpackers", search: "backpackers" }
+];
+const FUN_GROUPS = [
+  { k: "food", label: "Restaurants & cafés", search: "restaurants" },
+  { k: "night", label: "Local nightlife", search: "bars pubs" },
+  { k: "kids", label: "Things for kids to do", search: "things to do with kids" },
+  { k: "golf", label: "Golf courses", search: "golf course" },
+  { k: "cinema", label: "Cinemas & theatres", search: "cinema theatre" },
+  { k: "squash", label: "Squash courts", search: "squash courts" },
+  { k: "tennis", label: "Tennis clubs & courts", search: "tennis club" },
+  { k: "4x4", label: "4×4 trails", search: "4x4 trail" },
+  { k: "sport", label: "Other sports & recreation", search: "sports recreation" }
+];
+const HELP_GROUPS = [
+  { k: "medical", label: "Hospitals & clinics", search: "hospital" },
+  { k: "police", label: "Police stations", search: "police station" },
+  { k: "pharmacy", label: "Pharmacies", search: "pharmacy" },
+  { k: "fuel", label: "Fuel stations", search: "petrol station" }
+];
+// Farm stays only when explicitly tagged, so ordinary farms are never offered as lodging
+function stayKind(t) {
+  if (t.tourism === "farmstay" || t.accommodation === "farmstay" || t.guest_house === "farmstay" || (t.tourism === "guest_house" && t.farm === "yes")) return "farm";
+  return { hotel: "hotel", motel: "hotel", guest_house: "guest", apartment: "self", chalet: "self", hostel: "hostel" }[t.tourism] || null;
+}
+const OFFROAD = /\b(4wd|4x4|offroad|off[-_ ]road)\b/i;
+function funKind(t) {
+  const help = { hospital: "medical", clinic: "medical", doctors: "medical", police: "police", pharmacy: "pharmacy", fuel: "fuel" }[t.amenity];
+  if (help) return "help:" + help;
+  // 4x4 trails need explicit off-road route/sport tags or a trail name; rough-track tags alone don't count
+  if ((t.route && OFFROAD.test(t.route)) || (t.sport && OFFROAD.test(t.sport)) || (t.name && /4\s?x\s?4|4wd|off[- ]road/i.test(t.name) && !t.shop && !t.amenity && !t.craft && !t.office)) return "4x4";
+  if (t.amenity === "restaurant" || t.amenity === "cafe") return t.name ? "food" : null;
+  if (["bar", "pub", "nightclub", "biergarten"].includes(t.amenity)) return t.name ? "night" : null;
+  if (["cinema", "theatre", "arts_centre"].includes(t.amenity)) return "cinema";
+  if (t.leisure === "golf_course") return "golf";
+  if (/squash/.test(t.sport || "")) return "squash";
+  if (/tennis/.test(t.sport || "") && !/table_tennis/.test(t.sport)) return "tennis";
+  if (["playground", "water_park", "amusement_arcade", "miniature_golf", "trampoline_park"].includes(t.leisure) || ["zoo", "theme_park", "aquarium"].includes(t.tourism)) return "kids";
+  if (t.leisure || t.sport) return t.name ? "sport" : null;
+  return null;
+}
+const nice = v => v ? v.replace(/_/g, " ").replace(/;/g, ", ") : "";
+const phoneOf = t => t.phone || t["contact:phone"] || t["contact:mobile"] || "";
+function contactLinks(el, t, c) {
+  const ph = phoneOf(t).split(/[;,]/)[0].trim(), web = t.website || t["contact:website"];
+  return [dirLink(c), web && ["Website", web], ph && ["Call " + ph, "tel:" + ph.replace(/[^\d+]/g, "")], osmLink(el)].filter(Boolean);
+}
+const mapSearch = q => `https://www.google.com/maps/search/${encodeURIComponent(q)}/@${S.lat},${S.lon},12z`;
+
+async function loadExtra(live) {
+  const a = `(around:${S.radius},${S.lat},${S.lon})`;
+  const q = `[out:json][timeout:25];
+(
+  nwr["tourism"~"^(hotel|motel|hostel|guest_house|apartment|chalet|farmstay)$"]${a};
+  nwr["accommodation"="farmstay"]${a};
+  nwr["amenity"~"^(restaurant|cafe|bar|pub|nightclub|biergarten|cinema|theatre|arts_centre|hospital|clinic|doctors|police|pharmacy|fuel)$"]${a};
+  nwr["leisure"~"^(playground|water_park|amusement_arcade|miniature_golf|trampoline_park|golf_course|sports_centre|stadium|fitness_centre|horse_riding|marina|ice_rink)$"]${a};
+  nwr["leisure"="swimming_pool"]["name"]${a};
+  nwr["tourism"~"^(zoo|theme_park|aquarium)$"]${a};
+  nwr["sport"~"squash|tennis|4wd|offroad|off_road"]${a};
+  relation["route"~"^(4wd|offroad|off-road)$"]${a};
+);
+out tags center qt;`;
+  try {
+    const d = await overpass(q); if (!live()) return;
+    const stay = {}, fun = {}, help = {};
+    for (const el of d.elements || []) {
+      const t = el.tags || {}, c = center(el); if (!c) continue;
+      const id = "x" + el.type[0] + el.id, dist = haversine(S, c), name = t.name || t["name:en"];
+      const sk = stayKind(t);
+      if (sk) {
+        const g = STAY_GROUPS.find(x => x.k === sk);
+        const kind = sk === "farm" ? "Farm stay" : { hotel: "Hotel", motel: "Motel", guest_house: t.guest_house === "bed_and_breakfast" ? "B&B" : "Guest house", apartment: "Self-catering apartment", chalet: "Chalet", hostel: "Hostel" }[t.tourism];
+        const sub = [kind, t.stars && `${t.stars}★`, t.rooms && `${t.rooms} rooms`, t.operator, phoneOf(t)].filter(Boolean).join(" · ");
+        addPin("stay", id, c.lat, c.lon, popupHTML(name || g.label, sub, c.lat, c.lon, contactLinks(el, t, c).slice(1)));
+        (stay[sk] ||= []).push({ id, name: name || `${g.label} (unnamed)`, sub, right: km(dist), dist, links: contactLinks(el, t, c) });
+        continue;
+      }
+      const fk = funKind(t); if (!fk) continue;
+      if (fk.startsWith("help:")) {
+        const k = fk.slice(5), g = HELP_GROUPS.find(x => x.k === k);
+        const sub = [nice(t.amenity), t.emergency === "yes" && "has emergency department", t.opening_hours && "open " + t.opening_hours, phoneOf(t)].filter(Boolean).join(" · ");
+        addPin("help", id, c.lat, c.lon, popupHTML(name || g.label, sub, c.lat, c.lon, contactLinks(el, t, c).slice(1)));
+        (help[k] ||= []).push({ id, name: name || nice(t.amenity), sub, right: km(dist), dist, links: contactLinks(el, t, c) });
+        continue;
+      }
+      const label = nice(t.amenity || t.leisure || t.tourism || t.route || "venue");
+      const sub = [label.charAt(0).toUpperCase() + label.slice(1), t.cuisine && nice(t.cuisine), t.sport && nice(t.sport), t.opening_hours && "open " + t.opening_hours,
+        (t.access === "private" || t.access === "members" || t.access === "customers") && `access: ${t.access}`, t.fee === "yes" && "fee"].filter(Boolean).join(" · ");
+      addPin("fun", id, c.lat, c.lon, popupHTML(name || label, sub, c.lat, c.lon, contactLinks(el, t, c).slice(1)));
+      (fun[fk] ||= []).push({ id, name: name || label.charAt(0).toUpperCase() + label.slice(1), sub, right: km(dist), dist, links: contactLinks(el, t, c) });
+    }
+    const groupHTML = (groups, data, key, max, emptyAll) => {
+      let total = 0;
+      const html = groups.map(g => {
+        const arr = (data[g.k] || []).sort((a, b) => a.dist - b.dist); total += arr.length;
+        const more = linkBtns([["More on Google Maps", mapSearch(g.search)], key === "stay" && ["Booking.com", `https://www.booking.com/searchresults.html?ss=${encodeURIComponent(S.name)}`]]);
+        const extraNote = g.k === "4x4" && arr.length ? `<p class="callout" style="margin:8px 0">Confirm permission, bookings and track conditions with the operator before you drive. Many 4×4 routes cross private farmland.</p>` : "";
+        return `<div><h3>${esc(g.label)} <span class="count">${arr.length || ""}</span></h3>${itemsList(arr, key, max) || `<p class="empty">None mapped within ${S.radius / 1000} km.</p>`}${extraNote}<div class="links" style="margin-top:6px">${more}</div></div>`;
+      }).join("");
+      return (total ? "" : `<p class="empty">${emptyAll}</p>`) + `<div class="cols">${html}</div>`;
+    };
+    $("#stay").innerHTML = groupHTML(STAY_GROUPS, stay, "stay", 6, "No places to stay are mapped nearby. Try a bigger radius or the search links below.");
+    $("#fun").innerHTML = `${groupHTML(FUN_GROUPS, fun, "fun", 6, "Nothing mapped nearby yet. Try a bigger radius.")}
+      <div class="links">${linkBtns([["Live music & events", `https://www.google.com/search?q=${encodeURIComponent(`live music events ${S.name} this week`)}`], ["What's on", `https://www.google.com/search?q=${encodeURIComponent(`what's on in ${S.name}`)}`]])}</div>`;
+    $("#help-places").innerHTML = `<h3>Nearest help</h3><div class="cols">${HELP_GROUPS.map(g => {
+      const arr = (help[g.k] || []).sort((a, b) => a.dist - b.dist);
+      return `<div><h4>${esc(g.label)}</h4>${itemsList(arr, "help", 3) || `<p class="empty">None mapped within ${S.radius / 1000} km.</p>`}<div class="links" style="margin-top:6px">${linkBtns([["Search nearby", mapSearch(g.search)]])}</div></div>`;
+    }).join("")}</div>`;
+  } catch (err) {
+    if (!live()) return;
+    for (const s of ["#stay", "#fun"]) $(s).innerHTML = errHTML(`Map data did not load (${err.message}). The map servers may be busy.`, "extra");
+    $("#help-places").innerHTML = "";
+  }
+}
+
+/* ---------- emergency numbers: only once the country is known ---------- */
+const EMERGENCY = {
+  za: [["112", "Emergency from any mobile phone"], ["10111", "Police (SAPS)"], ["10177", "Ambulance"]],
+  us: [["911", "Police, fire and ambulance"]], ca: [["911", "Police, fire and ambulance"]],
+  gb: [["999", "Police, fire and ambulance"], ["112", "Also works from mobiles"]],
+  ie: [["112", "Police, fire and ambulance"], ["999", "Also works"]],
+  au: [["000", "Police, fire and ambulance"], ["112", "From mobiles"]],
+  nz: [["111", "Police, fire and ambulance"]],
+  ch: [["112", "General emergency"], ["117", "Police"], ["144", "Ambulance"], ["118", "Fire"]],
+  de: [["112", "Fire and ambulance"], ["110", "Police"]],
+  at: [["112", "General emergency"], ["133", "Police"], ["144", "Ambulance"]],
+  fr: [["112", "General emergency"], ["15", "Ambulance (SAMU)"], ["17", "Police"], ["18", "Fire"]]
+};
+for (const cc of ["nl", "be", "lu", "it", "es", "pt", "dk", "se", "fi", "no", "is", "pl", "cz", "sk", "si", "hr", "hu", "gr", "ro", "bg", "ee", "lv", "lt", "mt", "cy"]) EMERGENCY[cc] = [["112", "Police, fire and ambulance"]];
+async function loadHelp(live) {
+  let cc = S.country, cname = (S.region || "").split(",").pop().trim();
+  if (!cc) {
+    try {
+      const r = await getJSON(`${NOM}/reverse?${qs({ lat: S.lat, lon: S.lon, format: "jsonv2", zoom: 3, addressdetails: 1, "accept-language": LANG })}`);
+      cc = r.address?.country_code; cname = r.address?.country || cname; S.country = cc;
+    } catch {}
+  }
+  if (!live()) return;
+  const n = S.name, nums = cc && EMERGENCY[cc];
+  const call = ([num, what]) => `<li><span class="ic" style="background:var(--help)">${svg("cross")}</span><div class="body"><div class="name" style="font:700 1.3rem var(--display);user-select:all">${esc(num)}</div><div class="sub">${esc(what)}</div></div><a class="btn primary" href="tel:${esc(num)}">Call</a></li>`;
+  $("#help-numbers").innerHTML = !cc
+    ? `<p class="err">Couldn't work out which country this is, so no emergency numbers are shown. <button class="btn" type="button" data-retry="help">Try again</button></p>`
+    : nums ? `<h3>Emergency numbers${cname ? " in " + esc(cname) : ""}</h3><ul class="items" style="max-width:520px">${nums.map(call).join("")}</ul>`
+    : `<p class="empty">Placelore doesn't have checked emergency numbers for ${esc(cname || cc.toUpperCase())} yet.</p><div class="links">${linkBtns([["Emergency numbers for " + (cname || cc.toUpperCase()), `https://www.google.com/search?q=${encodeURIComponent("emergency phone numbers " + (cname || cc))}`]])}</div>`;
+  $("#help-links").innerHTML = linkBtns([
+    ["Police stations nearby", mapSearch("police station")], ["Hospitals nearby", mapSearch("hospital")], ["Fuel nearby", mapSearch("petrol station")],
+    ["Accommodation", `https://www.booking.com/searchresults.html?ss=${encodeURIComponent(n)}`],
+    cc === "za" && ["Yellow Pages South Africa", "https://www.yellowpages.co.za/"],
+    cc === "za" && ["Check a business registration (CIPC BizPortal)", "https://www.bizportal.gov.za/"]
+  ]);
+}
+RETRY.help = () => loadHelp(() => true);
+
+/* ---------- famous people (Wikidata) ---------- */
+async function loadPeople(live) {
+  const r = Math.min(S.radius / 1000, 15);
+  const q = `SELECT ?p ?pLabel ?pDescription ?birth ?death ?rel ?article ?links WHERE {
+  SERVICE wikibase:around { ?place wdt:P625 ?loc . bd:serviceParam wikibase:center "Point(${S.lon} ${S.lat})"^^geo:wktLiteral . bd:serviceParam wikibase:radius "${r}" . }
+  { ?p wdt:P19 ?place . BIND("born" AS ?rel) } UNION { ?p wdt:P20 ?place . BIND("died" AS ?rel) } UNION { ?p wdt:P119 ?place . BIND("buried" AS ?rel) }
+  ?p wdt:P31 wd:Q5 .
+  OPTIONAL { ?p wdt:P569 ?birth } OPTIONAL { ?p wdt:P570 ?death }
+  ?article schema:about ?p ; schema:isPartOf <https://${LANG}.wikipedia.org/> .
+  ?p wikibase:sitelinks ?links .
+  SERVICE wikibase:label { bd:serviceParam wikibase:language "${LANG}" . }
+} ORDER BY DESC(?links) LIMIT 120`;
+  try {
+    const d = await getJSON(`https://query.wikidata.org/sparql?${qs({ format: "json", query: q })}`, { headers: { Accept: "application/sparql-results+json" } }, 40000);
+    if (!live()) return;
+    const people = new Map();
+    for (const b of d.results?.bindings || []) {
+      const id = b.p.value, cur = people.get(id) || { name: b.pLabel?.value, desc: b.pDescription?.value, birth: b.birth?.value, death: b.death?.value, url: b.article.value, links: +b.links.value, rels: new Set() };
+      cur.rels.add(b.rel.value); people.set(id, cur);
+    }
+    const list = [...people.values()].filter(p => p.name && !/^Q\d+$/.test(p.name)).sort((a, b) => b.links - a.links);
+    if (!list.length) { $("#people").innerHTML = `<p class="empty">No notable people are recorded as born, died or buried within ${r} km.</p>`; return; }
+    const yr = v => v ? (v.startsWith("-") ? v.slice(1, 5).replace(/^0+/, "") + " BC" : v.slice(0, 4)) : "";
+    const row = p => `<li><span class="ic" style="background:var(--hist)">${svg("book")}</span><div class="body"><div class="name"><a href="${esc(p.url)}" target="_blank" rel="noopener">${esc(p.name)}</a> <span class="num">${esc([yr(p.birth), yr(p.death)].filter(Boolean).join("–"))}</span></div>${p.desc ? `<div class="sub">${esc(p.desc)}</div>` : ""}<div class="sub">${esc([...p.rels].map(x => x[0].toUpperCase() + x.slice(1) + " here").join(" · "))}</div></div></li>`;
+    $("#people").innerHTML = `<ul class="items" style="max-width:720px">${list.slice(0, 15).map(row).join("")}</ul>` +
+      (list.length > 15 ? `<details class="more showall"><summary>Show all ${list.length}</summary><ul class="items" style="max-width:720px">${list.slice(15).map(row).join("")}</ul></details>` : "");
+  } catch (err) { if (live()) $("#people").innerHTML = errHTML(`Notable people did not load (${err.message}).`, "people"); }
 }
 
 /* ---------- nearby Wikipedia articles ---------- */
