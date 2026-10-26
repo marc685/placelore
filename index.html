@@ -190,6 +190,14 @@ ul.items .acts button{background:none;border:0;padding:0;color:var(--pine);font:
 .recent .row button{font-size:.9rem}
 footer{padding-block:24px 40px;color:var(--muted);font-size:.85rem}
 
+/* article language */
+.langbar{display:inline-flex;align-items:center;gap:4px;margin:0 0 10px;padding:3px;border:1px solid var(--line);border-radius:999px;background:var(--surface);font-size:.9rem}
+.langbar span{color:var(--muted);padding:0 6px 0 8px}
+.langbar button{font:600 .88rem var(--body);border:0;border-radius:999px;padding:6px 12px;background:none;color:var(--ink);cursor:pointer;min-height:32px}
+.langbar button[aria-pressed="true"]{background:var(--pine);color:var(--surface)}
+.lang-note{color:var(--muted);font-size:.92rem;margin:0 0 10px}
+.linkish{background:none;border:0;padding:0;color:var(--pine);text-decoration:underline;cursor:pointer;font:inherit}
+.lang-tag{font:500 .7rem var(--mono);text-transform:uppercase;letter-spacing:.05em;padding:1px 6px;border-radius:4px;background:var(--pine-soft);color:var(--ink);vertical-align:middle}
 /* offline packs */
 .save-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:12px}
 .save-row .btn svg{width:18px;height:18px}
@@ -453,7 +461,6 @@ const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const qs = o => new URLSearchParams(o).toString();
 const LANG = "en";
-const WP = `https://${LANG}.wikipedia.org/w/api.php`;
 /* Every response a place loads is kept in RECORD so it can be saved as an offline pack;
    when the network fails, the saved pack answers instead. */
 let RECORD = new Map(), ACTIVE_PACK = null, inflight = 0;
@@ -484,7 +491,7 @@ const whenIdle = ms => new Promise(res => {
   idleWaiters.push(() => res(true)); setTimeout(() => res(false), ms);
   if (!inflight) setTimeout(() => { if (!inflight) res(true); }, 1500);
 });
-const wp = params => getJSON(`${WP}?${qs({ format: "json", formatversion: 2, origin: "*", ...params })}`);
+const wp = (params, lang = "en") => getJSON(`https://${lang}.wikipedia.org/w/api.php?${qs({ format: "json", formatversion: 2, origin: "*", ...params })}`);
 function haversine(a, b) {
   const R = 6371000, toR = x => x * Math.PI / 180;
   const dLat = toR(b.lat - a.lat), dLon = toR(b.lon - a.lon);
@@ -496,7 +503,9 @@ const loading = t => `<p class="loading">${esc(t)}</p>`;
 const errHTML = (msg, fn) => `<p class="err">${esc(msg)} <button class="btn" type="button" data-retry="${fn}">Try again</button></p>`;
 const paras = text => text.split(/\n+/).map(s => s.trim()).filter(Boolean).map(p => `<p>${esc(p)}</p>`).join("");
 const sentences = text => text.replace(/\n*={2,6}[^=\n]+={2,6}\n*/g, "\n").replace(/\s+/g, " ").split(/(?<=[.!?])\s+(?=[A-Z0-9"“(])/);
-const wikiUrl = t => `https://${LANG}.wikipedia.org/wiki/${encodeURIComponent(t.replace(/ /g, "_"))}`;
+const wikiUrl = (t, lang = "en") => `https://${lang}.wikipedia.org/wiki/${encodeURIComponent(t.replace(/ /g, "_"))}`;
+const translateUrl = (t, lang) => `https://translate.google.com/translate?sl=${lang}&tl=en&u=${encodeURIComponent(wikiUrl(t, lang))}`;
+const LANG_NAME = { en: "English", af: "Afrikaans" };
 function wikiTagUrl(tag) { if (!tag) return null; const m = tag.match(/^([a-z-]+):(.+)$/); return m ? `https://${m[1]}.wikipedia.org/wiki/${encodeURIComponent(m[2].replace(/ /g, "_"))}` : null; }
 const linkBtns = arr => arr.filter(Boolean).map(([t, u]) => `<a href="${esc(u)}" target="_blank" rel="noopener">${esc(t)}</a>`).join("");
 const store = { get(k, d) { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } }, set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} } };
@@ -728,9 +737,9 @@ function loadPlace(p) {
   loadWeather(live);
 }
 
-function setLinks(title) {
+function setLinks(title, lang = "en") {
   const n = S.name, ll = `${S.lat},${S.lon}`;
-  const wl = title ? wikiUrl(title) : `https://${LANG}.wikipedia.org/w/index.php?search=${encodeURIComponent(n)}`;
+  const wl = title ? wikiUrl(title, lang) : `https://en.wikipedia.org/w/index.php?search=${encodeURIComponent(n)}`;
   $("#ov-links").innerHTML = linkBtns([
     ["Wikipedia", wl], ["Wikivoyage travel guide", `https://en.wikivoyage.org/w/index.php?search=${encodeURIComponent(n)}`],
     ["OpenStreetMap", `https://www.openstreetmap.org/#map=13/${S.lat}/${S.lon}`], ["Google Maps", `https://www.google.com/maps/search/?api=1&query=${ll}`]
@@ -758,14 +767,14 @@ function setLinks(title) {
 }
 
 /* ---------- Wikipedia: main article ---------- */
-const SKIP = /^(see also|references|external links|notes|further reading|bibliography|sources|gallery|citations|footnotes|twin towns|sister cities|literature|verwysings|eksterne skakels)/i;
+const SKIP = /^(see also|references|external links|notes|further reading|bibliography|sources|gallery|citations|footnotes|twin towns|sister cities|literature|verwysings|eksterne skakels|sien ook|bronne|voetnote|notas|verdere leesstof|galery)/i;
 const CAT = {
   history: /histor|geskied|geschied|geschicht|colonial|settlement|founding|prehistor|archaeolog/i,
-  name: /etymolog|^name|naming|toponym|naam|origin of the name/i,
-  geo: /geolog|geograph|topograph|landscape|mountain|terrain|landform|physical/i,
+  name: /etymolog|^name|naming|toponym|naam|benaming|origin of the name|oorsprong/i,
+  geo: /geolog|geograph|geografie|topograph|landscape|landskap|ligging|mountain|berge|terrain|landform|physical/i,
   climate: /climate|klimaat|klima|weather/i,
-  nature: /flora|fauna|wildlife|ecolog|natur|environment|biodivers|vegetation|birds/i,
-  farm: /econom|agricult|farm|wine|viticult|industr|landbou|wirtschaft|produce|fruit/i,
+  nature: /flora|fauna|wildlife|ecolog|natur|environment|biodivers|vegetation|plantegroei|dierelewe|birds|voëls/i,
+  farm: /econom|ekonom|agricult|farm|plase|wine|wyn|viticult|industr|nywerhed|landbou|wirtschaft|produce|fruit|vrugte/i,
   people: /notable (people|residents|persons|individuals)|famous (people|residents)|personalities|bekende (persone|inwoners)/i
 };
 function parseSections(text) {
@@ -792,15 +801,15 @@ function sectionsHTML(secs, opts = {}) {
   }).join("");
 }
 
-async function resolveTitle() {
-  if (S.wikipedia) { const m = S.wikipedia.match(/^([a-z-]+):(.+)$/); if (m && m[1] === LANG) return { title: m[2], qid: S.wikidata }; }
-  if (S.wikidata) {
-    const d = await getJSON(`https://www.wikidata.org/w/api.php?${qs({ action: "wbgetentities", ids: S.wikidata, props: "sitelinks", sitefilter: LANG + "wiki", format: "json", origin: "*" })}`);
-    const t = d.entities?.[S.wikidata]?.sitelinks?.[LANG + "wiki"]?.title;
-    if (t) return { title: t, qid: S.wikidata };
-  }
-  // fallback: search, prefer pages with coordinates near the place
-  const d = await wp({ action: "query", generator: "search", gsrsearch: S.name + (S.region ? " " + S.region.split(",").pop() : ""), gsrlimit: 10, prop: "coordinates|pageprops", ppprop: "wikibase_item" });
+// Finds the place's article on English and Afrikaans Wikipedia: { en, af, qid } (titles or null)
+async function sitelinks(qid) {
+  const d = await getJSON(`https://www.wikidata.org/w/api.php?${qs({ action: "wbgetentities", ids: qid, props: "sitelinks", sitefilter: "enwiki|afwiki", format: "json", origin: "*" })}`);
+  const sl = d.entities?.[qid]?.sitelinks || {};
+  return { en: sl.enwiki?.title || null, af: sl.afwiki?.title || null };
+}
+async function searchNear(lang) {
+  // Search, preferring pages with coordinates near the place
+  const d = await wp({ action: "query", generator: "search", gsrsearch: S.name + (S.region ? " " + S.region.split(",").pop() : ""), gsrlimit: 10, prop: "coordinates|pageprops", ppprop: "wikibase_item" }, lang);
   const pages = (d.query?.pages || []).sort((a, b) => a.index - b.index);
   let best = null, bestD = Infinity;
   for (const pg of pages) { const c = pg.coordinates?.[0]; if (!c) continue; const dist = haversine(S, c); if (dist < bestD) { bestD = dist; best = pg; } }
@@ -808,16 +817,31 @@ async function resolveTitle() {
   const named = pages.find(pg => pg.title.toLowerCase().startsWith(S.name.toLowerCase()));
   return named ? { title: named.title, qid: named.pageprops?.wikibase_item } : null;
 }
+async function resolveTitles() {
+  const out = { en: null, af: null, qid: S.wikidata || null };
+  const tag = S.wikipedia?.match(/^(en|af):(.+)$/); if (tag) out[tag[1]] = tag[2];
+  let linked = false;
+  if (out.qid) { try { const sl = await sitelinks(out.qid); out.en ||= sl.en; out.af ||= sl.af; linked = true; } catch {} }
+  if (!out.en && !out.af) {
+    for (const lang of ["en", "af"]) {
+      const hit = await searchNear(lang).catch(() => null);
+      if (hit) { out[lang] = hit.title; out.qid ||= hit.qid; break; }
+    }
+  }
+  // Found by search: Wikidata tells us whether the other language has it too
+  if (!linked && out.qid && (!out.en || !out.af)) { try { const sl = await sitelinks(out.qid); out.en ||= sl.en; out.af ||= sl.af; } catch {} }
+  return out.en || out.af ? out : null;
+}
 
 async function wikidataFacts(qid) {
   if (!qid) return {};
-  const d = await getJSON(`https://www.wikidata.org/w/api.php?${qs({ action: "wbgetentities", ids: qid, props: "claims|descriptions", languages: LANG, format: "json", origin: "*" })}`);
+  const d = await getJSON(`https://www.wikidata.org/w/api.php?${qs({ action: "wbgetentities", ids: qid, props: "claims|descriptions", languages: "en|af", format: "json", origin: "*" })}`);
   const e = d.entities?.[qid]; if (!e) return {};
   const C = e.claims || {};
   const pick = p => { const arr = C[p] || []; return (arr.find(c => c.rank === "preferred") || arr[arr.length - 1])?.mainsnak?.datavalue?.value; };
   const amt = v => v ? Math.round(parseFloat(v.amount)) : null;
   const year = v => v?.time ? v.time.replace(/^\+/, "").slice(0, 4).replace(/^0+/, "") : null;
-  const facts = { description: e.descriptions?.[LANG]?.value };
+  const facts = { description: e.descriptions?.en?.value || e.descriptions?.af?.value };
   facts.population = amt(pick("P1082"));
   facts.elevation = amt(pick("P2044"));
   facts.area = pick("P2046") ? parseFloat(pick("P2046").amount) : null;
@@ -825,8 +849,12 @@ async function wikidataFacts(qid) {
   facts.nickname = pick("P1449")?.text;
   const named = (C.P138 || []).map(c => c.mainsnak?.datavalue?.value?.id).filter(Boolean);
   if (named.length) {
-    const n = await getJSON(`https://www.wikidata.org/w/api.php?${qs({ action: "wbgetentities", ids: named.join("|"), props: "labels|descriptions|sitelinks", languages: LANG, sitefilter: LANG + "wiki", format: "json", origin: "*" })}`);
-    facts.namedAfter = named.map(id => { const x = n.entities?.[id]; return x ? { label: x.labels?.[LANG]?.value || id, desc: x.descriptions?.[LANG]?.value, wiki: x.sitelinks?.[LANG + "wiki"]?.title } : null; }).filter(Boolean);
+    const n = await getJSON(`https://www.wikidata.org/w/api.php?${qs({ action: "wbgetentities", ids: named.join("|"), props: "labels|descriptions|sitelinks", languages: "en|af", sitefilter: "enwiki|afwiki", format: "json", origin: "*" })}`);
+    facts.namedAfter = named.map(id => {
+      const x = n.entities?.[id]; if (!x) return null;
+      const wl = x.sitelinks?.enwiki ? ["en", x.sitelinks.enwiki.title] : x.sitelinks?.afwiki ? ["af", x.sitelinks.afwiki.title] : null;
+      return { label: x.labels?.en?.value || x.labels?.af?.value || id, desc: x.descriptions?.en?.value || x.descriptions?.af?.value, wiki: wl && wl[1], wikiLang: wl && wl[0] };
+    }).filter(Boolean);
   }
   return facts;
 }
@@ -834,35 +862,49 @@ async function wikidataFacts(qid) {
 function nameOrigin(secs, fullText) {
   const ety = secs.filter(s => inCat(s, "name") && s.text);
   if (ety.length) return { text: ety.map(s => s.text).join("\n"), source: "section" };
-  const re = /\b(named (after|for|by)|name (comes|derives|is derived|was derived|originates|means|refers)|derived from|derives from|meaning|means “|means "|the word for|was called|originally called|takes its name)\b/i;
+  const re = /\b(named (after|for|by)|name (comes|derives|is derived|was derived|originates|means|refers)|derived from|derives from|meaning|means “|means "|the word for|was called|originally called|takes its name|vernoem|genoem na|naam (kom|is afgelei|beteken)|afgelei van|ontleen|beteken)\b/i;
   const hits = sentences(fullText.slice(0, 20000)).filter(s => re.test(s)).slice(0, 3);
   return hits.length ? { text: hits.join(" "), source: "sentences" } : null;
 }
 function interestingFacts(fullText) {
-  const re = /\b(oldest|first|largest|highest|longest|only|biggest|smallest|famous|known (as|for)|record|unique|earliest|tallest|deepest|world heritage|declared|discovered|founded in|established in)\b/i;
+  const re = /\b(oldest|first|largest|highest|longest|only|biggest|smallest|famous|known (as|for)|record|unique|earliest|tallest|deepest|world heritage|declared|discovered|founded in|established in|oudste|eerste|grootste|hoogste|langste|enigste|bekend|beroemd|wêrelderfenis|gestig)\b/i;
   const seen = new Set();
   return sentences(fullText).filter(s => s.length > 50 && s.length < 320 && re.test(s) && !/^=/.test(s)).filter(s => { const k = s.slice(0, 40); if (seen.has(k)) return false; seen.add(k); return true; }).slice(0, 8);
 }
 
 async function loadWiki(live) {
+  for (const id of ["#hist-deep", "#geo-wiki", "#climate-wiki", "#nature-wiki", "#farm-wiki", "#people-wiki", "#ov-name"]) $(id).innerHTML = "";
   try {
-    const r = await resolveTitle(); if (!live()) return;
+    const r = await resolveTitles(); if (!live()) return;
     if (!r) {
       S.setQid?.(S.wikidata || null);
       $("#ov-intro").innerHTML = `<p class="empty">No encyclopaedia article found for ${esc(S.name)}. The map, nature, climate and geology sections below still cover the area.</p>`;
       $("#ov-facts").innerHTML = `<p class="empty">No facts available.</p>`; $("#hist-wiki").innerHTML = `<p class="empty">No written history found. Try searching for the nearest larger town.</p>`;
       $("#factbox").innerHTML = factboxHTML({}, null); return;
     }
-    const d = await wp({ action: "query", prop: "extracts|pageimages|pageprops", explaintext: 1, exsectionformat: "wiki", titles: r.title, redirects: 1, piprop: "thumbnail", pithumbsize: 800, ppprop: "wikibase_item" });
+    // The reader's chosen language when the article exists in it, otherwise whichever exists
+    const pref = store.get("placelore.wikilang", "en");
+    const lang = r[pref] ? pref : r.en ? "en" : "af", other = lang === "en" ? "af" : "en";
+    const d = await wp({ action: "query", prop: "extracts|pageimages|pageprops|info", explaintext: 1, exsectionformat: "wiki", titles: r[lang], redirects: 1, piprop: "thumbnail", pithumbsize: 800, ppprop: "wikibase_item" }, lang);
     if (!live()) return;
     const page = d.query?.pages?.[0]; if (!page || page.missing) throw new Error("Article missing");
     const title = page.title, qid = r.qid || page.pageprops?.wikibase_item;
     S.setQid?.(qid);
-    S.wikiTitle = title; setLinks(title);
+    S.wikiTitle = title; S.wikiLang = lang; setLinks(title, lang);
     const full = page.extract || "";
     const secs = parseSections(full);
     const intro = secs.find(s => s.title === "Intro");
-    $("#ov-intro").innerHTML = `<div class="prose">${paras(intro?.text || "")}</div><p><a href="${wikiUrl(title)}" target="_blank" rel="noopener">Read the full “${esc(title)}” article ↗</a></p>`;
+    const langBar = r[other] ? `<div class="langbar" role="group" aria-label="Article language"><span>Read in</span>${["en", "af"].map(l => `<button type="button" data-wikilang="${l}" aria-pressed="${l === lang}">${LANG_NAME[l]}</button>`).join("")}</div>` : "";
+    const afNote = lang === "af" ? `<p class="lang-note">From Afrikaans Wikipedia${r.en ? "" : ", as there's no English article"}. <a href="${translateUrl(title, "af")}" target="_blank" rel="noopener">Translate to English ↗</a></p>` : "";
+    $("#ov-intro").innerHTML = `${langBar}${afNote}<div class="prose" lang="${lang}">${paras(intro?.text || "")}</div><p><a href="${wikiUrl(title, lang)}" target="_blank" rel="noopener">Read the full “${esc(title)}” article ↗</a></p><div id="langHint"></div>`;
+    $("#ov-intro").querySelectorAll("[data-wikilang]").forEach(b => b.addEventListener("click", () => { store.set("placelore.wikilang", b.dataset.wikilang); RETRY.wiki(); }));
+    // Point out when the other language's article is much fuller
+    if (r[other]) wp({ action: "query", prop: "info", titles: r[other], redirects: 1 }, other).then(o => {
+      const len = o.query?.pages?.[0]?.length || 0;
+      if (live() && len > 3000 && len > 1.8 * (page.length || 0)) $("#langHint").innerHTML = `<p class="lang-note">The ${LANG_NAME[other]} article is about ${Math.round(len / Math.max(page.length, 1))} times longer. <button type="button" class="linkish" data-wikilang="${other}">Read it in ${LANG_NAME[other]}</button></p>`;
+      $("#langHint [data-wikilang]")?.addEventListener("click", e => { store.set("placelore.wikilang", other); RETRY.wiki(); });
+    }).catch(() => {});
+    for (const id of ["#ov-facts", "#ov-name", "#hist-wiki", "#hist-deep", "#geo-wiki", "#climate-wiki", "#nature-wiki", "#farm-wiki", "#people-wiki"]) $(id).lang = lang;
 
     // facts box (async wikidata)
     wikidataFacts(qid).then(f => {
@@ -879,15 +921,15 @@ async function loadWiki(live) {
     const hist = secs.filter(s => inCat(s, "history"));
     $("#hist-wiki").innerHTML = hist.length ? sectionsHTML(hist, { collapse: 6 }) : `<div class="prose">${paras(intro?.text || "")}</div><p class="empty">The article has no separate history section.</p>`;
     // A dedicated "History of X" article, when one exists
-    wp({ action: "query", prop: "extracts", explaintext: 1, exsectionformat: "wiki", titles: `History of ${title}`, redirects: 1 }).then(h => {
+    wp({ action: "query", prop: "extracts", explaintext: 1, exsectionformat: "wiki", titles: lang === "af" ? `Geskiedenis van ${title}` : `History of ${title}`, redirects: 1 }, lang).then(h => {
       if (!live()) return; const hp = h.query?.pages?.[0];
       if (!hp || hp.missing || !hp.extract || hp.title === title) return;
       const hs = parseSections(hp.extract);
-      $("#hist-deep").innerHTML = `<div class="callout"><div class="eyebrow">In depth</div>There is a whole article on <a href="${wikiUrl(hp.title)}" target="_blank" rel="noopener">${esc(hp.title)}</a>. Expand the chapters below.</div>` +
+      $("#hist-deep").innerHTML = `<div class="callout"><div class="eyebrow">In depth</div>There is a whole article on <a href="${wikiUrl(hp.title, lang)}" target="_blank" rel="noopener">${esc(hp.title)}</a>. Expand the chapters below.</div>` +
         hs.filter(s => s.text).map(s => `<details class="more"><summary>${esc(s.title === "Intro" ? "Introduction" : s.title)}</summary><div class="prose">${paras(s.text)}</div></details>`).join("");
     }).catch(() => {});
 
-    const put = (sel, cat, label) => { const ss = secs.filter(s => inCat(s, cat)); if (ss.length) $(sel).innerHTML = `<div class="callout"><div class="eyebrow">${esc(label)}</div>From the encyclopaedia article</div>` + sectionsHTML(ss, { collapse: 4 }); };
+    const put = (sel, cat, label) => { const ss = secs.filter(s => inCat(s, cat)); if (ss.length) $(sel).innerHTML = `<div class="callout"><div class="eyebrow">${esc(label)}</div>From the encyclopaedia article${lang === "af" ? " (Afrikaans)" : ""}</div>` + sectionsHTML(ss, { collapse: 4 }); };
     put("#geo-wiki", "geo", "Landscape");
     put("#climate-wiki", "climate", "Climate in words");
     put("#nature-wiki", "nature", "Natural environment");
@@ -916,7 +958,7 @@ function factboxHTML(f, img, title) {
 }
 function renderName(secs, full, f) {
   const o = nameOrigin(secs, full);
-  const after = (f.namedAfter || []).map(n => n.wiki ? `<a href="${wikiUrl(n.wiki)}" target="_blank" rel="noopener">${esc(n.label)}</a>${n.desc ? ` (${esc(n.desc)})` : ""}` : esc(n.label)).join(", ");
+  const after = (f.namedAfter || []).map(n => n.wiki ? `<a href="${wikiUrl(n.wiki, n.wikiLang)}" target="_blank" rel="noopener">${esc(n.label)}</a>${n.desc ? ` (${esc(n.desc)})` : ""}` : esc(n.label)).join(", ");
   if (!o && !after) return;
   $("#ov-name").innerHTML = `<div class="callout"><div class="eyebrow">Where the name comes from</div>${after ? `<p style="margin:0 0 6px">Named after ${after}.</p>` : ""}${o ? `<div class="prose">${paras(o.text.length > 1500 ? o.text.slice(0, 1500) + "…" : o.text)}</div>` : ""}</div>`;
 }
@@ -1131,46 +1173,49 @@ function renderPOIs(els) {
 }
 
 /* ---------- rivers & etymology ---------- */
-const ETY_RE = /\b(named (after|for|by)|name (comes|derives|is derived|was derived|originates|means|refers|is)|derived from|derives from|derive[sd]? its name|meaning|means\b|the word for|was called|originally called|takes its name|in the .{0,20} language)\b/i;
+const ETY_RE = /\b(named (after|for|by)|name (comes|derives|is derived|was derived|originates|means|refers|is)|derived from|derives from|derive[sd]? its name|meaning|means\b|the word for|was called|originally called|takes its name|in the .{0,20} language|vernoem|genoem na|afgelei van|ontleen|beteken|die naam)\b/i;
 async function riverStory(r) {
-  // returns {title, text, namedAfter}
-  let title = null, qid = r.tags.wikidata || null, out = {};
+  // returns {title, lang, text, intro, desc, length, namedAfter, tagEty}
+  const titles = { en: null, af: null }, qid = r.tags.wikidata || null, out = {};
   if (r.tags["name:etymology"]) out.tagEty = r.tags["name:etymology"];
-  const wt = r.tags.wikipedia?.match(/^([a-z-]+):(.+)$/);
-  if (wt && wt[1] === LANG) title = wt[2];
+  const wt = r.tags.wikipedia?.match(/^(en|af):(.+)$/);
+  if (wt) titles[wt[1]] = wt[2];
   if (qid) {
     try {
-      const d = await getJSON(`https://www.wikidata.org/w/api.php?${qs({ action: "wbgetentities", ids: qid, props: "sitelinks|claims|descriptions", sitefilter: LANG + "wiki", languages: LANG, format: "json", origin: "*" })}`);
+      const d = await getJSON(`https://www.wikidata.org/w/api.php?${qs({ action: "wbgetentities", ids: qid, props: "sitelinks|claims|descriptions", sitefilter: "enwiki|afwiki", languages: "en|af", format: "json", origin: "*" })}`);
       const e = d.entities?.[qid];
-      title = title || e?.sitelinks?.[LANG + "wiki"]?.title;
-      out.desc = e?.descriptions?.[LANG]?.value;
+      titles.en ||= e?.sitelinks?.enwiki?.title; titles.af ||= e?.sitelinks?.afwiki?.title;
+      out.desc = e?.descriptions?.en?.value || e?.descriptions?.af?.value;
       const L2 = e?.claims?.P2043?.[0]?.mainsnak?.datavalue?.value; if (L2) out.length = Math.round(parseFloat(L2.amount));
       const named = (e?.claims?.P138 || []).map(c => c.mainsnak?.datavalue?.value?.id).filter(Boolean);
       if (named.length) {
-        const n = await getJSON(`https://www.wikidata.org/w/api.php?${qs({ action: "wbgetentities", ids: named.join("|"), props: "labels|descriptions", languages: LANG, format: "json", origin: "*" })}`);
-        out.namedAfter = named.map(id => n.entities?.[id]).filter(Boolean).map(x => x.labels?.[LANG]?.value + (x.descriptions?.[LANG]?.value ? ` (${x.descriptions[LANG].value})` : ""));
+        const n = await getJSON(`https://www.wikidata.org/w/api.php?${qs({ action: "wbgetentities", ids: named.join("|"), props: "labels|descriptions", languages: "en|af", format: "json", origin: "*" })}`);
+        out.namedAfter = named.map(id => n.entities?.[id]).filter(Boolean).map(x => { const l = x.labels?.en?.value || x.labels?.af?.value || ""; const d2 = x.descriptions?.en?.value || x.descriptions?.af?.value; return l + (d2 ? ` (${d2})` : ""); });
       }
     } catch {}
   }
-  if (!title) {
-    // search, accept only articles whose coordinates are near
-    const q = /river|rivier|stream|creek|brook|fluss|bach|spruit/i.test(r.name) ? r.name : `${r.name} river`;
-    const d = await wp({ action: "query", generator: "search", gsrsearch: q, gsrlimit: 6, prop: "coordinates", coprop: "type", colimit: "max" });
-    const pages = (d.query?.pages || []).sort((a, b) => a.index - b.index);
+  if (!titles.en && !titles.af) {
+    // search, accepting only articles whose coordinates are near; Afrikaans names rivers "-rivier"
     const nm = r.name.toLowerCase().split(/\s+/)[0];
-    const hit = pages.find(p => p.title.toLowerCase().includes(nm) && p.coordinates?.some(c => haversine(S, c) < 200000));
-    title = hit?.title;
-  }
-  if (title) {
-    const d = await wp({ action: "query", prop: "extracts", explaintext: 1, exsectionformat: "wiki", titles: title, redirects: 1 });
-    const pg = d.query?.pages?.[0];
-    if (pg && !pg.missing && pg.extract) {
-      out.title = pg.title;
-      const secs = parseSections(pg.extract);
-      const ety = secs.filter(s => CAT.name.test(s.title) && s.text);
-      out.text = ety.length ? ety.map(s => s.text).join(" ") : sentences(pg.extract.replace(/==.+?==/g, " ")).filter(s => ETY_RE.test(s)).slice(0, 3).join(" ");
-      out.intro = sentences(secs.find(s => s.title === "Intro")?.text || "").slice(0, 2).join(" ");
+    for (const lang of ["en", "af"]) {
+      const q = /river|rivier|stream|creek|brook|fluss|bach|spruit/i.test(r.name) ? r.name : lang === "af" ? `${r.name}rivier` : `${r.name} river`;
+      const d = await wp({ action: "query", generator: "search", gsrsearch: q, gsrlimit: 6, prop: "coordinates", coprop: "type", colimit: "max" }, lang).catch(() => null);
+      const pages = (d?.query?.pages || []).sort((a, b) => a.index - b.index);
+      const hit = pages.find(p => p.title.toLowerCase().includes(nm) && p.coordinates?.some(c => haversine(S, c) < 200000));
+      if (hit) { titles[lang] = hit.title; break; }
     }
+  }
+  for (const lang of ["en", "af"]) {
+    if (!titles[lang]) continue;
+    const d = await wp({ action: "query", prop: "extracts", explaintext: 1, exsectionformat: "wiki", titles: titles[lang], redirects: 1 }, lang);
+    const pg = d.query?.pages?.[0];
+    if (!pg || pg.missing || !pg.extract) continue;
+    const secs = parseSections(pg.extract);
+    const ety = secs.filter(s => CAT.name.test(s.title) && s.text);
+    const text = ety.length ? ety.map(s => s.text).join(" ") : sentences(pg.extract).filter(s => ETY_RE.test(s)).slice(0, 3).join(" ");
+    if (!out.title) { out.title = pg.title; out.lang = lang; out.intro = sentences(secs.find(s => s.title === "Intro")?.text || "").slice(0, 2).join(" "); }
+    // The English article may say nothing about the name while the Afrikaans one does
+    if (text) { out.text = text; out.textLang = lang; out.textTitle = pg.title; break; }
   }
   return out;
 }
@@ -1190,10 +1235,12 @@ function renderRivers(list) {
       if (o.desc || o.length) bits.push(`<p style="margin:0 0 4px">${esc([o.desc, o.length && `${o.length} km long in total`].filter(Boolean).join(" · "))}</p>`);
       if (o.namedAfter?.length) bits.push(`<p style="margin:0 0 4px"><b>Named after:</b> ${esc(o.namedAfter.join(", "))}</p>`);
       if (o.tagEty) bits.push(`<p style="margin:0 0 4px"><b>Name origin:</b> ${esc(o.tagEty)}</p>`);
-      if (o.text) bits.push(`<p style="margin:0 0 4px"><b>The name:</b> ${esc(o.text.length > 900 ? o.text.slice(0, 900) + "…" : o.text)}</p>`);
+      if (o.text) bits.push(`<p style="margin:0 0 4px" lang="${o.textLang}"><b>The name${o.textLang === "af" ? " (Afrikaans Wikipedia)" : ""}:</b> ${esc(o.text.length > 900 ? o.text.slice(0, 900) + "…" : o.text)}</p>`);
       else if (o.intro) bits.push(`<p style="margin:0 0 4px">${esc(o.intro)}</p>`);
       if (!o.text && !o.tagEty && !o.namedAfter?.length) bits.push(`<p class="empty" style="margin:0 0 4px">No recorded origin for this name yet.</p>`);
-      const links = [o.title && ["Wikipedia", wikiUrl(o.title)], ["Search the name's origin", `https://www.google.com/search?q=${encodeURIComponent(`${r.name} name origin meaning`)}`]];
+      const links = [o.title && [o.lang === "af" ? "Wikipedia (Afrikaans)" : "Wikipedia", wikiUrl(o.title, o.lang)],
+        o.textLang === "af" && o.textTitle && ["Translate to English", translateUrl(o.textTitle, "af")],
+        o.textLang && o.textLang !== o.lang && ["Wikipedia (Afrikaans)", wikiUrl(o.textTitle, "af")], ["Search the name's origin", `https://www.google.com/search?q=${encodeURIComponent(`${r.name} name origin meaning`)}`]];
       el.innerHTML = bits.join("") + `<div class="links" style="margin-top:6px">${linkBtns(links)}</div>`;
     }).catch(() => { const el = document.querySelector(`#river-${i} .origin`); if (el) el.innerHTML = `<p class="empty">Could not look up this name.</p>`; });
   });
@@ -1576,14 +1623,16 @@ RETRY.help = () => loadHelp(() => true);
 /* ---------- famous people (Wikidata) ---------- */
 async function loadPeople(live) {
   const r = Math.min(S.radius / 1000, 8);
-  const query = placeClause => `SELECT ?p ?pLabel ?pDescription ?birth ?death ?rel ?article ?links WHERE {
+  const query = placeClause => `SELECT ?p ?pLabel ?pDescription ?birth ?death ?rel ?en ?af ?links WHERE {
   ${placeClause}
   { ?p wdt:P19 ?place . BIND("born" AS ?rel) } UNION { ?p wdt:P20 ?place . BIND("died" AS ?rel) } UNION { ?p wdt:P119 ?place . BIND("buried" AS ?rel) }
   ?p wdt:P31 wd:Q5 .
   OPTIONAL { ?p wdt:P569 ?birth } OPTIONAL { ?p wdt:P570 ?death }
-  ?article schema:about ?p ; schema:isPartOf <https://${LANG}.wikipedia.org/> .
+  OPTIONAL { ?en schema:about ?p ; schema:isPartOf <https://en.wikipedia.org/> . }
+  OPTIONAL { ?af schema:about ?p ; schema:isPartOf <https://af.wikipedia.org/> . }
+  FILTER(BOUND(?en) || BOUND(?af))
   ?p wikibase:sitelinks ?links .
-  SERVICE wikibase:label { bd:serviceParam wikibase:language "${LANG}" . }
+  SERVICE wikibase:label { bd:serviceParam wikibase:language "en,af" . }
 } ORDER BY DESC(?links) LIMIT 120`;
   const sparql = async (q, ms) => {
     if (location.protocol.startsWith("http")) {
@@ -1604,13 +1653,13 @@ async function loadPeople(live) {
     if (!live()) return;
     const people = new Map();
     for (const b of d.results?.bindings || []) {
-      const id = b.p.value, cur = people.get(id) || { name: b.pLabel?.value, desc: b.pDescription?.value, birth: b.birth?.value, death: b.death?.value, url: b.article.value, links: +b.links.value, rels: new Set() };
+      const id = b.p.value, cur = people.get(id) || { name: b.pLabel?.value, desc: b.pDescription?.value, birth: b.birth?.value, death: b.death?.value, url: b.en?.value || b.af?.value, afOnly: !b.en, links: +b.links.value, rels: new Set() };
       cur.rels.add(b.rel.value); people.set(id, cur);
     }
     const list = [...people.values()].filter(p => p.name && !/^Q\d+$/.test(p.name)).sort((a, b) => b.links - a.links);
     if (!list.length) { $("#people").innerHTML = `<p class="empty">No notable people are recorded as born, died or buried ${scope}.</p>`; return; }
     const yr = v => v ? (v.startsWith("-") ? v.slice(1, 5).replace(/^0+/, "") + " BC" : v.slice(0, 4)) : "";
-    const row = p => `<li><span class="ic" style="background:var(--hist)">${svg("book")}</span><div class="body"><div class="name"><a href="${esc(p.url)}" target="_blank" rel="noopener">${esc(p.name)}</a> <span class="num">${esc([yr(p.birth), yr(p.death)].filter(Boolean).join("–"))}</span></div>${p.desc ? `<div class="sub">${esc(p.desc)}</div>` : ""}<div class="sub">${esc([...p.rels].map(x => x[0].toUpperCase() + x.slice(1) + " here").join(" · "))}</div></div></li>`;
+    const row = p => `<li><span class="ic" style="background:var(--hist)">${svg("book")}</span><div class="body"><div class="name"><a href="${esc(p.url)}" target="_blank" rel="noopener">${esc(p.name)}</a>${p.afOnly ? ` <span class="lang-tag">Afrikaans</span>` : ""} <span class="num">${esc([yr(p.birth), yr(p.death)].filter(Boolean).join("–"))}</span></div>${p.desc ? `<div class="sub">${esc(p.desc)}</div>` : ""}<div class="sub">${esc([...p.rels].map(x => x[0].toUpperCase() + x.slice(1) + " here").join(" · "))}</div></div></li>`;
     $("#people").innerHTML = `<ul class="items" style="max-width:720px">${list.slice(0, 15).map(row).join("")}</ul>` +
       (list.length > 15 ? `<details class="more showall"><summary>Show all ${list.length}</summary><ul class="items" style="max-width:720px">${list.slice(15).map(row).join("")}</ul></details>` : "");
   } catch (err) { if (live()) $("#people").innerHTML = errHTML(`Notable people did not load (${err.message}).`, "people"); }
@@ -1619,17 +1668,22 @@ async function loadPeople(live) {
 /* ---------- nearby Wikipedia articles ---------- */
 async function loadNearby(live) {
   try {
-    const d = await wp({ action: "query", generator: "geosearch", ggscoord: `${S.lat}|${S.lon}`, ggsradius: 10000, ggslimit: 20, prop: "extracts|pageimages|coordinates|description", exintro: 1, explaintext: 1, exsentences: 3, exlimit: 20, piprop: "thumbnail", pithumbsize: 240, pilimit: 20 });
+    const geo = lang => wp({ action: "query", generator: "geosearch", ggscoord: `${S.lat}|${S.lon}`, ggsradius: 10000, ggslimit: 20, prop: "extracts|pageimages|coordinates|description|pageprops", ppprop: "wikibase_item", exintro: 1, explaintext: 1, exsentences: 3, exlimit: 20, piprop: "thumbnail", pithumbsize: 240, pilimit: 20 }, lang)
+      .then(d => (d.query?.pages || []).map(p => ({ ...p, lang })));
+    const [en, af] = await Promise.all([geo("en"), geo("af").catch(() => [])]);
     if (!live()) return;
-    const pages = (d.query?.pages || []).filter(p => p.title !== S.wikiTitle && p.coordinates?.[0]).map(p => ({ ...p, dist: haversine(S, p.coordinates[0]) })).sort((a, b) => a.dist - b.dist);
+    // Afrikaans pages are added only when they're about something with no English page
+    const seen = new Set(en.map(p => p.pageprops?.wikibase_item).filter(Boolean));
+    const pages = [...en, ...af.filter(p => !p.pageprops?.wikibase_item || !seen.has(p.pageprops.wikibase_item))]
+      .filter(p => p.title !== S.wikiTitle && p.coordinates?.[0]).map(p => ({ ...p, dist: haversine(S, p.coordinates[0]) })).sort((a, b) => a.dist - b.dist).slice(0, 30);
     if (!pages.length) { $("#nearby").innerHTML = `<p class="empty">No encyclopaedia entries within 10 km.</p>`; return; }
-    pages.forEach(p => { const c = p.coordinates[0]; addPin("wiki", "w" + p.pageid, c.lat, c.lon, popupHTML(p.title, p.description || "", c.lat, c.lon, [["Wikipedia", wikiUrl(p.title)]])); });
-    $("#nearby").innerHTML = `<div class="cols">${pages.map(p => `<article style="display:flex;gap:12px;align-items:flex-start;min-width:0">
+    pages.forEach(p => { const c = p.coordinates[0]; addPin("wiki", "w" + p.lang + p.pageid, c.lat, c.lon, popupHTML(p.title, p.description || "", c.lat, c.lon, [[p.lang === "af" ? "Wikipedia (Afrikaans)" : "Wikipedia", wikiUrl(p.title, p.lang)]])); });
+    $("#nearby").innerHTML = `<div class="cols">${pages.map(p => `<article style="display:flex;gap:12px;align-items:flex-start;min-width:0" lang="${p.lang}">
       ${p.thumbnail ? `<img src="${esc(p.thumbnail.source)}" alt="" loading="lazy" style="width:84px;height:84px;object-fit:cover;border-radius:8px;flex:none">` : ""}
-      <div style="min-width:0"><div style="font:700 1.05rem var(--display)">${esc(p.title)} <span class="num">${km(p.dist)}</span></div>
+      <div style="min-width:0"><div style="font:700 1.05rem var(--display)">${esc(p.title)} <span class="num">${km(p.dist)}</span>${p.lang === "af" ? ` <span class="lang-tag">Afrikaans</span>` : ""}</div>
       ${p.description ? `<div style="color:var(--muted);font-size:.88rem">${esc(p.description)}</div>` : ""}
       <p style="margin:4px 0;font-size:.95rem">${esc(p.extract || "")}</p>
-      <div class="acts" style="display:flex;gap:12px;font-size:.88rem"><button type="button" data-focus="w${p.pageid}" style="background:none;border:0;padding:0;color:var(--pine);text-decoration:underline;cursor:pointer;font:inherit">Show on map</button><a href="${wikiUrl(p.title)}" target="_blank" rel="noopener">Read more ↗</a></div></div></article>`).join("")}</div>`;
+      <div class="acts" style="display:flex;gap:12px;font-size:.88rem;flex-wrap:wrap"><button type="button" data-focus="w${p.lang}${p.pageid}" style="background:none;border:0;padding:0;color:var(--pine);text-decoration:underline;cursor:pointer;font:inherit">Show on map</button><a href="${wikiUrl(p.title, p.lang)}" target="_blank" rel="noopener">Read more ↗</a>${p.lang === "af" ? `<a href="${translateUrl(p.title, "af")}" target="_blank" rel="noopener">Translate ↗</a>` : ""}</div></div></article>`).join("")}</div>`;
   } catch (err) { if (live()) $("#nearby").innerHTML = errHTML(`Nearby articles did not load (${err.message}).`, "nearby"); }
 }
 
