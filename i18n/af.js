@@ -581,5 +581,17 @@ window.I18N.af = {
  "Ice cap": "Yskap",
  "Text from Wikipedia and the map is translated into {lang} by AI.": "Teks uit Wikipedia en die kaart word deur KI in {lang} vertaal.",
  "Show original": "Wys oorspronklike",
- "Show translation": "Wys vertaling"
+ "Show translation": "Wys vertaling",
+ "Unnamed footpaths": "Naamlose voetpaaie",
+ "Loading footpaths…": "Laai voetpaaie…",
+ "{d} of unnamed footpaths shown on the map.": "{d} se naamlose voetpaaie op die kaart gewys.",
+ "No unnamed footpaths mapped here.": "Geen naamlose voetpaaie hier gekarteer nie.",
+ "Footpaths did not load ({err}). Switch the layer off and on to try again.": "Voetpaaie het nie gelaai nie ({err}). Skakel die laag af en weer aan om weer te probeer.",
+ "Switch on “Unnamed footpaths” on the map to see smaller paths too.": "Skakel “Naamlose voetpaaie” op die kaart aan om ook kleiner paadjies te sien.",
+ "Translate every section automatically": "Vertaal elke afdeling outomaties",
+ "Translating…": "Vertaal tans…",
+ "Translate into {lang}": "Vertaal na {lang}",
+ "Translation didn't work. Try again.": "Vertaling het nie gewerk nie. Probeer weer.",
+ "Translated by AI.": "Deur KI vertaal.",
+ "Some text couldn't be translated.": "Party teks kon nie vertaal word nie."
 };

@@ -551,5 +551,17 @@ window.I18N.zu = {
  "Ambulance (SAMU)": "I-ambulensi (SAMU)",
  "Text from Wikipedia and the map is translated into {lang} by AI.": "Umbhalo ovela ku-Wikipedia nasemephini uhunyushelwe ku-{lang} yi-AI.",
  "Show original": "Bonisa okwangempela",
- "Show translation": "Bonisa ukuhumusha"
+ "Show translation": "Bonisa ukuhumusha",
+ "Unnamed footpaths": "Izindledlana ezingenamagama",
+ "Loading footpaths…": "Ilayisha izindledlana…",
+ "{d} of unnamed footpaths shown on the map.": "{d} wezindledlana ezingenamagama ukhonjiswa emephini.",
+ "No unnamed footpaths mapped here.": "Azikho izindledlana ezingenamagama emephini lapha.",
+ "Footpaths did not load ({err}). Switch the layer off and on to try again.": "Izindledlana azilayishekanga ({err}). Cisha ungqimba bese uluvula futhi ukuze uzame futhi.",
+ "Switch on “Unnamed footpaths” on the map to see smaller paths too.": "Vula u-“Izindledlana ezingenamagama” emephini ukuze ubone nezindlela ezincane.",
+ "Translate every section automatically": "Humusha zonke izigaba ngokuzenzakalela",
+ "Translating…": "Iyahumusha…",
+ "Translate into {lang}": "Humushela ku-{lang}",
+ "Translation didn't work. Try again.": "Ukuhumusha akusebenzanga. Zama futhi.",
+ "Translated by AI.": "Kuhunyushwe yi-AI.",
+ "Some text couldn't be translated.": "Omunye umbhalo awukwazanga ukuhunyushwa."
 };

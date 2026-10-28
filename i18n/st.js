@@ -551,5 +551,17 @@ window.I18N.st = {
  "Ambulance (SAMU)": "Ambulense (SAMU)",
  "Text from Wikipedia and the map is translated into {lang} by AI.": "Mongolo o tswang ho Wikipedia le mmapeng o fetoletswe ho {lang} ke AI.",
  "Show original": "Bontsha ya pele",
- "Show translation": "Bontsha phetolelo"
+ "Show translation": "Bontsha phetolelo",
+ "Unnamed footpaths": "Ditselana tse se nang mabitso",
+ "Loading footpaths…": "E kenya ditselana…",
+ "{d} of unnamed footpaths shown on the map.": "{d} ya ditselana tse se nang mabitso e bontshwa mmapeng.",
+ "No unnamed footpaths mapped here.": "Ha ho ditselana tse se nang mabitso mmapeng mona.",
+ "Footpaths did not load ({err}). Switch the layer off and on to try again.": "Ditselana ha di a kena ({err}). Tima karolo ena o e bulele hape ho leka hape.",
+ "Switch on “Unnamed footpaths” on the map to see smaller paths too.": "Bulela “Ditselana tse se nang mabitso” mmapeng ho bona le ditselana tse nyane.",
+ "Translate every section automatically": "Fetolela karolo e nngwe le e nngwe ka bowona",
+ "Translating…": "E a fetolela…",
+ "Translate into {lang}": "Fetolela ho {lang}",
+ "Translation didn't work. Try again.": "Phetolelo ha e a sebetsa. Leka hape.",
+ "Translated by AI.": "E fetoletswe ke AI.",
+ "Some text couldn't be translated.": "Mongolo o mong ha o a kgona ho fetolelwa."
 };

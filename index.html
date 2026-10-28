@@ -218,6 +218,9 @@ footer{padding-block:24px 40px;color:var(--muted);font-size:.85rem}
 .plan li .where{font-size:.9rem;color:var(--muted)}
 .plan li .tip{font-size:.9rem;margin-top:4px;padding:6px 10px;border-radius:8px;background:var(--pine-soft)}
 .plan-num{display:grid;place-items:center;width:28px;height:28px;border-radius:50%;background:var(--ochre);color:#fff;font:700 13px/1 var(--mono);border:2px solid #fff;box-shadow:0 1px 4px rgb(0 0 0 / .45)}
+.xl-bar{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;margin:6px 0 12px}
+.xl-auto{display:inline-flex;align-items:center;gap:6px;cursor:pointer}
+.xl-auto input{accent-color:var(--pine);margin:0}
 /* offline packs */
 .save-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:12px}
 .save-row .btn svg{width:18px;height:18px}
@@ -628,6 +631,7 @@ function candFromMarkers(kind, items) {
 
 const LAYERS = [
   { key: "trails", label: tr("Trails"), color: "--trail", icon: "boot" },
+  { key: "paths", label: tr("Unnamed footpaths"), color: "--trail", icon: "boot", off: true },
   { key: "camp", label: tr("Camping"), color: "--camp", icon: "tent" },
   { key: "picnic", label: tr("Picnic"), color: "--picnic", icon: "table" },
   { key: "farm", label: tr("Farms"), color: "--farm", icon: "barn" },
@@ -656,10 +660,14 @@ function initMap() {
   L.control.scale({ imperial: false }).addTo(map);
   const tg = $("#toggles");
   for (const l of LAYERS) {
-    layers[l.key] = L.layerGroup().addTo(map);
+    layers[l.key] = L.layerGroup();
+    if (!l.off) layers[l.key].addTo(map);
     const lab = document.createElement("label");
-    lab.innerHTML = `<input type="checkbox" id="lt-${l.key}" checked><span class="swatch" style="background:var(${l.color})"></span>${esc(l.label)}`;
-    lab.querySelector("input").addEventListener("change", e => e.target.checked ? layers[l.key].addTo(map) : map.removeLayer(layers[l.key]));
+    lab.innerHTML = `<input type="checkbox" id="lt-${l.key}" ${l.off ? "" : "checked"}><span class="swatch" style="background:var(${l.color})${l.off ? ";opacity:.5" : ""}"></span>${esc(l.label)}`;
+    lab.querySelector("input").addEventListener("change", e => {
+      if (e.target.checked) { layers[l.key].addTo(map); if (l.key === "paths") loadUnnamedPaths(); }
+      else map.removeLayer(layers[l.key]);
+    });
     tg.appendChild(lab);
   }
   centerLayer = L.layerGroup().addTo(map);
@@ -814,7 +822,7 @@ function loadPlace(p) {
   map.setView([p.lat, p.lon], zoom);
   L.circle([p.lat, p.lon], { radius: S.radius, color: css("--pine"), weight: 1, fill: false, dashArray: "4 6", interactive: false }).addTo(centerLayer);
   if (p.gps) L.marker([p.lat, p.lon], { icon: L.divIcon({ className: "", html: '<div class="me-dot"></div>', iconSize: [16, 16] }) }).bindPopup(tr("You are here")).addTo(centerLayer);
-  xlPairs = []; xlShowing = true; $("#xlNote")?.remove();
+  xlState.clear(); document.querySelectorAll(".xl-bar").forEach(b => b.remove());
   applySections();
   restorePlan();
   setTimeout(() => map.invalidateSize(), 50);
@@ -825,6 +833,7 @@ function loadPlace(p) {
   (RETRY.wiki = () => loadWiki(live))();
   (RETRY.osm = () => loadOSM(live))();
   loadWeather(live);
+  if ($("#lt-paths")?.checked) loadUnnamedPaths();
   RETRY.nature = () => loadNature(live); lazy("s-nature", RETRY.nature);
   RETRY.climate = () => loadClimate(live); lazy("s-climate", RETRY.climate);
   RETRY.geo = () => loadGeology(live); lazy("geology", RETRY.geo);
@@ -1123,7 +1132,7 @@ async function loadOSM(live) {
   const qLines = `[out:json][timeout:45];
 (
   relation["route"~"^(hiking|foot|walking)$"]${a};
-  way["highway"~"^(path|bridleway)$"]${at};
+  way["highway"~"^(path|bridleway)$"]["name"]${at};
   way["highway"~"^(footway|track|steps)$"]["name"]${at};
   way["waterway"~"^(river|stream|canal)$"]["name"]${a};
 );
@@ -1157,6 +1166,28 @@ way["landuse"="forest"]${a};out count;`;
   await Promise.all([linesP, poiP]);
 }
 
+// Unnamed footpaths can run to thousands of lines in hiking country, so they load on request
+let pathsFor = null;
+async function loadUnnamedPaths() {
+  if (!S || pathsFor === token) return;
+  const my = pathsFor = token, Rt = Math.min(S.radius, 12000);
+  const q = `[out:json][timeout:45];way["highway"~"^(path|bridleway)$"][!"name"](${bbox(S.lat, S.lon, Rt)});out tags geom(${bbox(S.lat, S.lon, S.radius * 1.05)}) qt;`;
+  const st = $("#pathsStatus"); if (st) st.textContent = tr("Loading footpaths…");
+  try {
+    const d = await overpass(q); if (my !== token) return;
+    const col = css("--trail"); let total = 0;
+    for (const el of d.elements || []) {
+      const t = el.tags || {}, segs = segments(el.geometry); if (!segs.length) continue;
+      total += segLen(segs);
+      L.polyline(segs, { color: col, weight: 2, opacity: .55, dashArray: "3 4" })
+        .bindPopup(popupHTML(tr("Footpath"), [tr(t.highway), t.sac_scale && tr("difficulty: {d}", { d: tr(t.sac_scale.replace(/_/g, " ")) }), t.surface && tr(t.surface)].filter(Boolean).join(" · "), segs[0][0][0], segs[0][0][1], [osmLink(el)]))
+        .addTo(layers.paths);
+    }
+    if (st) st.textContent = total ? tr("{d} of unnamed footpaths shown on the map.", { d: km(total) }) : tr("No unnamed footpaths mapped here.");
+  } catch (err) {
+    if (my === token) { pathsFor = null; if (st) st.textContent = tr("Footpaths did not load ({err}). Switch the layer off and on to try again.", { err: err.message }); }
+  }
+}
 function itemsList(items, key, max = 12) {
   if (!items.length) return null;
   const l = LAYERS.find(x => x.key === key);
@@ -1170,7 +1201,7 @@ const osmLink = el => ["OSM", `https://www.openstreetmap.org/${el.type}/${el.id}
 function renderLines(els) {
   const trailCol = css("--trail"), riverCol = css("--river");
   // trails
-  const routes = [], paths = new Map(); let unnamedLen = 0;
+  const routes = [], paths = new Map();
   for (const el of els) {
     const t = el.tags || {};
     if (el.type === "relation" && t.route) {
@@ -1190,7 +1221,7 @@ function renderLines(els) {
       if (t.name) {
         const p = paths.get(t.name) || { segs: [], len: 0, tags: t };
         p.segs.push(...segs); p.len += len; paths.set(t.name, p);
-      } else unnamedLen += len;
+      }
     }
   }
   const pathItems = [...paths.entries()].map(([name, p], i) => {
@@ -1202,7 +1233,7 @@ function renderLines(els) {
   const all = [...routes.sort((a, b) => b.len - a.len), ...pathItems];
   $("#c-trails").textContent = all.length ? `${all.length}` : "";
   $("#trails").innerHTML = (itemsList(all, "trails", 15) || `<p class="empty">${tr("No named trails mapped within {n} km.", { n: S.radius / 1000 })}</p>`) +
-    (unnamedLen > 500 ? `<p class="sub" style="color:var(--muted);font-size:.9rem;margin-top:8px">${tr("Plus {d} of unnamed footpaths shown on the map.", { d: km(unnamedLen) })}</p>` : "");
+    `<p class="sub" style="color:var(--muted);font-size:.9rem;margin-top:8px" id="pathsStatus">${$("#lt-paths")?.checked ? "" : tr("Switch on “Unnamed footpaths” on the map to see smaller paths too.")}</p>`;
 
   // rivers
   const rivers = new Map();
@@ -2036,7 +2067,7 @@ const SECTIONS = [
   { id: "s-stay", label: tr("Accommodation & farm stays"), layers: ["stay"] },
   { id: "s-map", label: tr("Map") },
   { id: "s-history", label: tr("History"), layers: ["hist"] },
-  { id: "s-outdoors", label: tr("Trails, camping & picnic spots"), layers: ["trails", "camp", "picnic", "view"] },
+  { id: "s-outdoors", label: tr("Trails, camping & picnic spots"), layers: ["trails", "paths", "camp", "picnic", "view"] },
   { id: "s-nature", label: tr("Wildlife & birds") },
   { id: "s-climate", label: tr("Climate") },
   { id: "s-geology", label: tr("Rivers, mountains & geology"), layers: ["river", "peak"] },
@@ -2181,68 +2212,98 @@ if (SR) {
 
 
 /* ---------- translating place content ---------- */
-// Text from Wikipedia, Wikidata, Macrostrat and the map arrives mostly in English. When the app is
-// set to another language, the server translates it; the app's own wording (class "ui") is left alone.
+// Text from Wikipedia, Wikidata, Macrostrat and the map arrives mostly in English. When the app is set to
+// another language, each section offers a Translate button (or translates by itself if the reader chose
+// that); the server does the translating. The app's own wording (class "ui") is left alone.
 const XL_SKIP = ".ui, .eyebrow, .lang-note, .links, .acts, button, a, .num, .lang-tag, .empty, .err, .loading, dt, summary.ui";
-const xlDone = new WeakSet(), xlMemo = new Map();
-let xlPairs = [], xlShowing = true, xlTimer = null, xlBusy = false;
+const xlDone = new WeakSet(), xlMemo = new Map(), xlState = new Map();
+let xlTimer = null;
+const autoXL = () => store.get("placelore.autoxl", false);
 const srcLang = n => { const el = n.parentElement?.closest("[lang]"); return el && el !== document.documentElement ? el.lang.slice(0, 2) : "en"; };
+function secState(sec) {
+  let st = xlState.get(sec);
+  if (!st) xlState.set(sec, st = { on: autoXL(), showing: true, busy: false, pairs: [] });
+  return st;
+}
+// Untranslated text, grouped by the section it sits in
 function xlCandidates() {
-  const out = [];
+  const out = new Map();
   for (const root of document.querySelectorAll("#app [data-xl]")) {
-    if (root.closest("[hidden]")) continue;  // hidden sections aren't paid for until shown
+    const sec = root.closest("main > section");
+    if (!sec || root.closest("[hidden]")) continue;  // hidden sections aren't offered or paid for
     const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
     for (let n; (n = w.nextNode());) {
       if (xlDone.has(n) || !/\p{L}{3}/u.test(n.nodeValue) || n.parentElement.closest(XL_SKIP) || srcLang(n) === UILANG) continue;
-      out.push(n);
+      if (!out.has(sec)) out.set(sec, []);
+      out.get(sec).push(n);
     }
   }
   return out;
 }
-function scheduleXL() { if (UILANG === "en") return; clearTimeout(xlTimer); xlTimer = setTimeout(runXL, 700); }
-function applyXL(n, tx) {
-  const orig = n.nodeValue, translated = orig.match(/^\s*/)[0] + tx + orig.match(/\s*$/)[0];
-  xlPairs.push([n, orig, translated]);
-  if (xlShowing) n.nodeValue = translated;
-  showXLNote();
+function scheduleXL() { if (UILANG === "en") return; clearTimeout(xlTimer); xlTimer = setTimeout(runXL, 600); }
+function runXL() {
+  const bySec = xlCandidates();
+  for (const [sec, nodes] of bySec) { const st = secState(sec); if (st.on && !st.busy) translateSection(sec, st, nodes); }
+  for (const sec of document.querySelectorAll("#app main > section")) renderXLBar(sec, bySec.get(sec)?.length || 0);
 }
-async function runXL() {
-  if (xlBusy) return scheduleXL();
-  const nodes = xlCandidates(); if (!nodes.length) return;
-  xlBusy = true;
-  try {
-    const pending = [];
-    for (const n of nodes) { xlDone.add(n); const hit = xlMemo.get(n.nodeValue.trim()); hit ? applyXL(n, hit) : pending.push(n); }
-    const chunks = []; let cur = [], len = 0;
-    for (const n of pending) {
-      const t = n.nodeValue.trim();
-      if (cur.length && (cur.length >= 40 || len + t.length > 8000)) { chunks.push(cur); cur = []; len = 0; }
-      cur.push(n); len += t.length;
-    }
-    if (cur.length) chunks.push(cur);
-    for (const ch of chunks) {
-      const texts = ch.map(n => n.nodeValue.trim().slice(0, 4000));
-      try {
-        const d = await getJSON("/api/translate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ lang: UILANG, texts }) }, 120000);
-        d.translations.forEach((tx, i) => { if (tx) { xlMemo.set(texts[i], tx); applyXL(ch[i], tx); } });
-      } catch { /* the original text stays */ }
-    }
-  } finally { xlBusy = false; }
-}
-function showXLNote() {
-  let note = $("#xlNote");
-  if (!note) {
-    $("#s-overview h2").insertAdjacentHTML("afterend", `<p class="lang-note" id="xlNote">${tr("Text from Wikipedia and the map is translated into {lang} by AI.", { lang: UI_LANGS[UILANG] })} <button type="button" class="linkish" id="xlToggle"></button></p>`);
-    note = $("#xlNote");
-    $("#xlToggle").addEventListener("click", () => {
-      xlShowing = !xlShowing;
-      for (const [n, o, t] of xlPairs) if (n.isConnected) n.nodeValue = xlShowing ? t : o;
-      showXLNote();
-    });
+async function translateSection(sec, st, nodes) {
+  st.busy = true; renderXLBar(sec, nodes.length);
+  const apply = (n, tx) => {
+    const orig = n.nodeValue, translated = orig.match(/^\s*/)[0] + tx + orig.match(/\s*$/)[0];
+    st.pairs.push([n, orig, translated]);
+    if (st.showing) n.nodeValue = translated;
+  };
+  const pending = [];
+  for (const n of nodes) { xlDone.add(n); const hit = xlMemo.get(n.nodeValue.trim()); hit ? apply(n, hit) : pending.push(n); }
+  const chunks = []; let cur = [], len = 0;
+  for (const n of pending) {
+    const t = n.nodeValue.trim();
+    if (cur.length && (cur.length >= 40 || len + t.length > 8000)) { chunks.push(cur); cur = []; len = 0; }
+    cur.push(n); len += t.length;
   }
-  $("#xlToggle").textContent = xlShowing ? tr("Show original") : tr("Show translation");
+  if (cur.length) chunks.push(cur);
+  let failed = false;
+  for (const ch of chunks) {
+    const texts = ch.map(n => n.nodeValue.trim().slice(0, 4000));
+    try {
+      const d = await getJSON("/api/translate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ lang: UILANG, texts }) }, 120000);
+      d.translations.forEach((tx, i) => { if (tx) { xlMemo.set(texts[i], tx); apply(ch[i], tx); } });
+    } catch { failed = true; ch.forEach(n => xlDone.delete(n)); }  // can be retried
+  }
+  st.busy = false; st.failed = failed;
+  if (failed && !st.pairs.length) st.on = false;
+  renderXLBar(sec, 0);
+  scheduleXL();  // text that arrived while translating
 }
-if (UILANG !== "en") new MutationObserver(scheduleXL).observe($("#app"), { childList: true, subtree: true });
+function renderXLBar(sec, waiting) {
+  const st = secState(sec);
+  let bar = sec.querySelector(":scope > .xl-bar");
+  if (!waiting && !st.pairs.length && !st.busy && !st.failed) { bar?.remove(); return; }
+  const lang = UI_LANGS[UILANG];
+  const auto = sec.id === "s-overview" ? ` <label class="xl-auto"><input type="checkbox" data-xl-auto ${autoXL() ? "checked" : ""}> ${tr("Translate every section automatically")}</label>` : "";
+  const html = st.busy ? `<span class="loading">${tr("Translating…")}</span>`
+    : !st.on || (st.failed && !st.pairs.length) ? `<button type="button" class="btn" data-xl-go>${tr("Translate into {lang}", { lang })}</button>${st.failed ? ` <span class="err">${tr("Translation didn't work. Try again.")}</span>` : ""}${auto}`
+    : `<span>${tr("Translated by AI.")}</span> <button type="button" class="linkish" data-xl-toggle>${st.showing ? tr("Show original") : tr("Show translation")}</button>${st.failed ? ` <span class="err">${tr("Some text couldn't be translated.")}</span> <button type="button" class="linkish" data-xl-go>${tr("Try again")}</button>` : ""}${auto}`;
+  if (bar?.dataset.html === html) return;  // nothing changed: leave the page alone
+  if (!bar) { bar = document.createElement("div"); bar.className = "xl-bar ui lang-note"; sec.querySelector("h2").after(bar); }
+  bar.dataset.html = html; bar.innerHTML = html;
+}
+document.addEventListener("click", e => {
+  const go = e.target.closest("[data-xl-go]"), tog = e.target.closest("[data-xl-toggle]");
+  if (!go && !tog) return;
+  const sec = e.target.closest("main > section"), st = secState(sec);
+  if (go) { st.on = true; st.failed = false; runXL(); }
+  if (tog) { st.showing = !st.showing; for (const [n, o, t] of st.pairs) if (n.isConnected) n.nodeValue = st.showing ? t : o; renderXLBar(sec, 0); }
+});
+document.addEventListener("change", e => {
+  if (!e.target.matches("[data-xl-auto]")) return;
+  store.set("placelore.autoxl", e.target.checked);
+  if (e.target.checked) { for (const sec of document.querySelectorAll("#app main > section")) secState(sec).on = true; runXL(); }
+});
+// New content arriving in a section is picked up; the bars' own updates are ignored
+if (UILANG !== "en") new MutationObserver(recs => {
+  if (recs.some(r => !r.target.closest?.(".xl-bar") && ![...r.addedNodes, ...r.removedNodes].every(n => n.classList?.contains("xl-bar")))) scheduleXL();
+}).observe($("#app"), { childList: true, subtree: true });
 
 /* ---------- interface language ---------- */
 function translatePage() {
