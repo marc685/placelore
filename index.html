@@ -11,8 +11,8 @@
 <link rel="apple-touch-icon" href="/icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zilla+Slab:wght@500;700&family=Source+Sans+3:ital,wght@0,400;0,600;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap">
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zilla+Slab:wght@500;700&family=Source+Sans+3:ital,wght@0,400;0,600;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap" media="print" onload="this.media='all'">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" media="print" onload="this.media='all'">
 <style>
 /* Layout: sticky search bar, place band, sticky chapter chips, one long field-guide scroll with the map near the top */
 :root{
@@ -221,6 +221,17 @@ footer{padding-block:24px 40px;color:var(--muted);font-size:.85rem}
 .xl-bar{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;margin:6px 0 12px}
 .xl-auto{display:inline-flex;align-items:center;gap:6px;cursor:pointer}
 .xl-auto input{accent-color:var(--pine);margin:0}
+/* areas */
+main section{padding-block:20px}
+main section > h2{cursor:pointer}
+main section:not(.open):not(#s-overview) > h2{font-size:1.3rem}
+main section.open{padding-block:24px 28px}
+.sec-head{display:flex;align-items:center;gap:8px 14px;flex-wrap:wrap;margin-top:4px}
+.main-point{margin:0;color:var(--muted);flex:1 1 260px;max-width:65ch}
+.main-point:empty{display:none}
+.read-more{padding:8px 14px}
+section.open .read-more{background:var(--pine-soft);border-color:var(--pine)}
+.sec-body{margin-top:14px}
 /* offline packs */
 .save-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:12px}
 .save-row .btn svg{width:18px;height:18px}
@@ -347,14 +358,18 @@ footer{padding-block:24px 40px;color:var(--muted);font-size:.85rem}
       <h2>Overview</h2>
       <div class="overview">
         <div style="min-width:0">
-          <div id="ov-intro" data-xl><p class="loading">Finding the encyclopaedia entry…</p></div>
-          <div id="ov-name" data-xl></div>
-          <h3>Interesting facts</h3>
-          <div id="ov-facts" data-xl><p class="loading">Gathering facts…</p></div>
+          <div id="ov-summary" data-xl><p class="loading">Finding the encyclopaedia entry…</p></div>
+          <div class="sec-head"><p class="main-point" id="mp-s-overview"></p><button type="button" class="btn read-more" data-open="s-overview">Read more</button></div>
+          <div class="sec-body" hidden>
+            <div id="ov-intro" data-xl></div>
+            <div id="ov-name" data-xl></div>
+            <h3>Interesting facts</h3>
+            <div id="ov-facts" data-xl><p class="loading">Gathering facts…</p></div>
+            <div class="links" id="ov-links"></div>
+          </div>
         </div>
         <aside class="factbox" id="factbox" data-xl><dl><dt>Loading</dt><dd>…</dd></dl></aside>
       </div>
-      <div class="links" id="ov-links"></div>
     </section>
 
     <section id="s-plan">
@@ -689,7 +704,7 @@ function addPin(key, id, lat, lon, html) {
 }
 function focusOn(id) {
   const m = markerIndex[id]; if (!m) return;
-  $("#s-map").scrollIntoView({ behavior: "smooth" });
+  openSection("s-map");
   setTimeout(() => {
     if (m.getLatLng) map.setView(m.getLatLng(), Math.max(map.getZoom(), 15)); else map.fitBounds(m.getBounds(), { maxZoom: 16 });
     m.openPopup ? m.openPopup() : null;
@@ -809,7 +824,7 @@ function loadPlace(p) {
   try { history.replaceState(null, "", `?q=${encodeURIComponent(p.name)}&lat=${p.lat.toFixed(5)}&lon=${p.lon.toFixed(5)}`); } catch {}
 
   // reset UI
-  const reset = { "#ov-intro": tr("Finding the encyclopaedia entry…"), "#ov-facts": tr("Gathering facts…"), "#hist-wiki": tr("Reading the history…"), "#hist-sites": tr("Searching the map…"), "#rivers": tr("Tracing the waterways…"), "#trails": tr("Loading trails…"), "#camping": tr("Loading camp sites…"), "#picnic": tr("Loading picnic spots…"), "#views": tr("Loading…"), "#nature": tr("Looking for birds and animals…"), "#climate": tr("Crunching ten years of weather…"), "#geology": tr("Reading the geological map…"), "#peaks": tr("Finding peaks…"), "#farms": tr("Finding farms…"), "#nearby": tr("Looking for nearby articles…"), "#stay": tr("Finding places to stay…"), "#people": tr("Looking up notable people…"), "#help-numbers": tr("Checking which country you're in…"), "#fun": tr("Finding things to do…") };
+  const reset = { "#ov-summary": tr("Finding the encyclopaedia entry…"), "#ov-intro": tr("Finding the encyclopaedia entry…"), "#ov-facts": tr("Gathering facts…"), "#hist-wiki": tr("Reading the history…"), "#hist-sites": tr("Searching the map…"), "#rivers": tr("Tracing the waterways…"), "#trails": tr("Loading trails…"), "#camping": tr("Loading camp sites…"), "#picnic": tr("Loading picnic spots…"), "#views": tr("Loading…"), "#nature": tr("Looking for birds and animals…"), "#climate": tr("Crunching ten years of weather…"), "#geology": tr("Reading the geological map…"), "#peaks": tr("Finding peaks…"), "#farms": tr("Finding farms…"), "#nearby": tr("Looking for nearby articles…"), "#stay": tr("Finding places to stay…"), "#people": tr("Looking up notable people…"), "#help-numbers": tr("Checking which country you're in…"), "#fun": tr("Finding things to do…") };
   for (const [k, v] of Object.entries(reset)) $(k).innerHTML = loading(v);
   for (const k of ["#ov-name", "#hist-deep", "#nature-wiki", "#climate-wiki", "#geo-wiki", "#farm-wiki", "#landuse", "#people-wiki", "#help-places"]) $(k).innerHTML = "";
   for (const k of ["#c-trails", "#c-camp", "#c-picnic", "#c-view", "#c-peaks"]) $(k).textContent = "";
@@ -824,26 +839,71 @@ function loadPlace(p) {
   if (p.gps) L.marker([p.lat, p.lon], { icon: L.divIcon({ className: "", html: '<div class="me-dot"></div>', iconSize: [16, 16] }) }).bindPopup(tr("You are here")).addTo(centerLayer);
   xlState.clear(); document.querySelectorAll(".xl-bar").forEach(b => b.remove());
   applySections();
-  restorePlan();
   setTimeout(() => map.invalidateSize(), 50);
   window.scrollTo({ top: 0 });
 
-  // The overview, map data and weather load now; the rest loads as it scrolls into view
+  // Only the summary, facts and weather load now; each area loads when it's opened
   initLazy();
-  (RETRY.wiki = () => loadWiki(live))();
-  (RETRY.osm = () => loadOSM(live))();
+  pointsFromPlace();
+  restorePlan();
+  RETRY.summary = () => loadSummary(live); RETRY.summary();
   loadWeather(live);
-  if ($("#lt-paths")?.checked) loadUnnamedPaths();
-  RETRY.nature = () => loadNature(live); lazy("s-nature", RETRY.nature);
-  RETRY.climate = () => loadClimate(live); lazy("s-climate", RETRY.climate);
-  RETRY.geo = () => loadGeology(live); lazy("geology", RETRY.geo);
-  RETRY.nearby = () => loadNearby(live); lazy("s-nearby", RETRY.nearby);
-  RETRY.people = () => loadPeople(live); lazy("s-people", RETRY.people);
-  RETRY.extra = () => loadExtra(live);
-  const extraOnce = once(RETRY.extra);  // one query serves stay, recreation and nearest help
-  lazy("s-stay", extraOnce); lazy("s-fun", extraOnce); lazy("help-places", extraOnce);
-  lazy("help-numbers", () => loadHelp(live));
+  RETRY.wiki = () => loadWiki(live); RETRY.osm = () => loadOSM(live); RETRY.extra = () => loadExtra(live);
+  RETRY.nature = () => loadNature(live); RETRY.climate = () => loadClimate(live); RETRY.geo = () => loadGeology(live);
+  RETRY.nearby = () => loadNearby(live); RETRY.people = () => loadPeople(live); RETRY.help = () => loadHelp(live);
+  RUN = {
+    wiki: once(RETRY.wiki), osm: once(RETRY.osm), extra: once(RETRY.extra), nature: once(RETRY.nature),
+    climate: once(RETRY.climate), geo: once(RETRY.geo), nearby: once(RETRY.nearby), people: once(RETRY.people),
+    help: once(RETRY.help), paths: () => { if ($("#lt-paths")?.checked) loadUnnamedPaths(); }
+  };
+  closeAllSections();
 }
+
+/* ---------- areas open one at a time ---------- */
+let RUN = {};
+const AREA_LOADS = {
+  "s-overview": ["wiki"], "s-plan": [], "s-stay": ["extra"], "s-map": ["osm", "extra", "nearby", "paths"],
+  "s-history": ["wiki", "osm"], "s-outdoors": ["osm", "paths"], "s-nature": ["nature", "wiki"], "s-climate": ["climate", "wiki"],
+  "s-geology": ["osm", "geo", "wiki"], "s-farms": ["osm", "wiki"], "s-people": ["people", "wiki"], "s-nearby": ["nearby"],
+  "s-help": ["help", "extra"], "s-fun": ["extra"]
+};
+// Every area except the overview gets a heading line with its main point and a Read more button
+function buildAreas() {
+  for (const sec of document.querySelectorAll("main > section")) {
+    if (sec.id === "s-overview" || sec.querySelector(":scope > .sec-body")) continue;
+    const h2 = sec.querySelector(":scope > h2");
+    const head = document.createElement("div"); head.className = "sec-head";
+    head.innerHTML = `<p class="main-point" id="mp-${sec.id}"></p><button type="button" class="btn read-more" data-open="${sec.id}">${tr("Read more")}</button>`;
+    const body = document.createElement("div"); body.className = "sec-body"; body.hidden = true;
+    while (h2.nextSibling) body.appendChild(h2.nextSibling);
+    sec.append(head, body);
+  }
+}
+function setPoint(id, text) { const el = document.getElementById("mp-" + id); if (el) el.textContent = text; }
+function closeAllSections() {
+  document.querySelectorAll("main > section").forEach(sec => setOpen(sec, false));
+  $("#ov-summary").hidden = false;
+}
+function setOpen(sec, open) {
+  const body = sec.querySelector(".sec-body"), btn = sec.querySelector(".read-more");
+  if (!body) return;
+  body.hidden = !open; sec.classList.toggle("open", open);
+  if (btn) btn.textContent = open ? tr("Show less") : tr("Read more");
+  if (sec.id === "s-overview") $("#ov-summary").hidden = open;  // the full introduction replaces the summary
+}
+function openSection(id, { scroll = true } = {}) {
+  const sec = document.getElementById(id); if (!sec || sec.hidden) return;
+  document.querySelectorAll("main > section.open").forEach(o => { if (o !== sec) setOpen(o, false); });
+  setOpen(sec, true);
+  (AREA_LOADS[id] || []).forEach(k => RUN[k]?.());
+  if (id === "s-map" && map) setTimeout(() => map.invalidateSize(), 30);
+  if (scroll) sec.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+document.addEventListener("click", e => {
+  const b = e.target.closest(".read-more"); if (b) { const sec = document.getElementById(b.dataset.open); sec.classList.contains("open") ? (setOpen(sec, false), sec.scrollIntoView({ block: "start" })) : openSection(b.dataset.open); return; }
+  const h = e.target.closest("main > section > h2"); if (h) { const sec = h.parentElement; sec.classList.contains("open") ? setOpen(sec, false) : openSection(sec.id); return; }
+  const chip = e.target.closest("nav.chapters a[href^='#s-']"); if (chip) { e.preventDefault(); openSection(chip.getAttribute("href").slice(1)); }
+});
 
 /* ---------- loading sections on demand ---------- */
 const once = f => { let done = false; return () => { if (!done) { done = true; f(); } }; };
@@ -861,6 +921,7 @@ function lazy(id, fn) {
 }
 // Planning, saving for offline and the assistant need everything, so they load what's left
 function loadEverything() {
+  Object.values(RUN).forEach(f => f());
   const all = [...lazyRun.values()].flat(); lazyRun.clear(); lazyObs?.disconnect();
   all.forEach(f => f());
 }
@@ -931,9 +992,8 @@ function sectionsHTML(secs, opts = {}) {
 
 // Finds the place's article on English and Afrikaans Wikipedia: { en, af, qid } (titles or null)
 async function sitelinks(qid) {
-  const d = await getJSON(`https://www.wikidata.org/w/api.php?${qs({ action: "wbgetentities", ids: qid, props: "sitelinks", sitefilter: "enwiki|afwiki", format: "json", origin: "*" })}`);
-  const sl = d.entities?.[qid]?.sitelinks || {};
-  return { en: sl.enwiki?.title || null, af: sl.afwiki?.title || null };
+  const f = await factsFor(qid);  // the facts request carries the article titles too
+  return { en: f.sitelinks?.enwiki?.title || null, af: f.sitelinks?.afwiki?.title || null };
 }
 async function searchNear(lang) {
   // Search, preferring pages with coordinates near the place
@@ -963,27 +1023,28 @@ async function resolveTitles() {
 
 async function wikidataFacts(qid) {
   if (!qid) return {};
-  const d = await getJSON(`https://www.wikidata.org/w/api.php?${qs({ action: "wbgetentities", ids: qid, props: "claims|descriptions", languages: "en|af", format: "json", origin: "*" })}`);
+  const d = await getJSON(`https://www.wikidata.org/w/api.php?${qs({ action: "wbgetentities", ids: qid, props: "claims|descriptions|sitelinks", sitefilter: "enwiki|afwiki", languages: "en|af", format: "json", origin: "*" })}`);
   const e = d.entities?.[qid]; if (!e) return {};
   const C = e.claims || {};
   const pick = p => { const arr = C[p] || []; return (arr.find(c => c.rank === "preferred") || arr[arr.length - 1])?.mainsnak?.datavalue?.value; };
   const amt = v => v ? Math.round(parseFloat(v.amount)) : null;
   const year = v => v?.time ? v.time.replace(/^\+/, "").slice(0, 4).replace(/^0+/, "") : null;
-  const facts = { description: e.descriptions?.en?.value || e.descriptions?.af?.value };
+  const facts = { description: e.descriptions?.en?.value || e.descriptions?.af?.value, sitelinks: e.sitelinks };
   facts.population = amt(pick("P1082"));
   facts.elevation = amt(pick("P2044"));
   facts.area = pick("P2046") ? parseFloat(pick("P2046").amount) : null;
   facts.founded = year(pick("P571"));
   facts.nickname = pick("P1449")?.text;
   const named = (C.P138 || []).map(c => c.mainsnak?.datavalue?.value?.id).filter(Boolean);
-  if (named.length) {
+  if (named.length) facts.namedAfterP = (async () => {
     const n = await getJSON(`https://www.wikidata.org/w/api.php?${qs({ action: "wbgetentities", ids: named.join("|"), props: "labels|descriptions|sitelinks", languages: "en|af", sitefilter: "enwiki|afwiki", format: "json", origin: "*" })}`);
     facts.namedAfter = named.map(id => {
       const x = n.entities?.[id]; if (!x) return null;
       const wl = x.sitelinks?.enwiki ? ["en", x.sitelinks.enwiki.title] : x.sitelinks?.afwiki ? ["af", x.sitelinks.afwiki.title] : null;
       return { label: x.labels?.en?.value || x.labels?.af?.value || id, desc: x.descriptions?.en?.value || x.descriptions?.af?.value, wiki: wl && wl[1], wikiLang: wl && wl[0] };
     }).filter(Boolean);
-  }
+    return facts.namedAfter;
+  })().catch(() => []);
   return facts;
 }
 
@@ -1000,10 +1061,66 @@ function interestingFacts(fullText) {
   return sentences(fullText).filter(s => s.length > 50 && s.length < 320 && re.test(s) && !/^=/.test(s)).filter(s => { const k = s.slice(0, 40); if (seen.has(k)) return false; seen.add(k); return true; }).slice(0, 8);
 }
 
+const factsMemo = new Map();
+function factsFor(qid) {
+  if (!factsMemo.has(qid)) factsMemo.set(qid, wikidataFacts(qid).catch(e => { factsMemo.delete(qid); throw e; }));
+  return factsMemo.get(qid);
+}
+// The first thing a reader sees: Wikipedia's short summary, the facts box and History's main point
+async function loadSummary(live) {
+  const box = $("#ov-summary");
+  try {
+    const r = await (S.titlesP ||= resolveTitles()); if (!live()) return;
+    if (!r) {
+      S.setQid?.(S.wikidata || null);
+      box.innerHTML = `<p class="empty">${tr("No encyclopaedia article found for {place}. The map, nature, climate and geology sections below still cover the area.", { place: esc(S.name) })}</p>`;
+      $("#factbox").innerHTML = factboxHTML({}, null); return;
+    }
+    const pref = store.get("placelore.wikilang", UILANG === "af" ? "af" : "en");
+    const lang = r[pref] ? pref : r.en ? "en" : "af";
+    const [d, f] = await Promise.all([
+      getJSON(`https://${lang}.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(r[lang].replace(/ /g, "_"))}`, {}, 8000),
+      r.qid ? factsFor(r.qid).catch(() => ({})) : Promise.resolve(null)
+    ]);
+    if (!live()) return;
+    box.innerHTML = `<div class="prose" lang="${lang}">${paras(d.extract || "")}</div>`;
+    const qid = r.qid || d.wikibase_item; S.setQid?.(qid);
+    const facts = f || await factsFor(qid).catch(() => ({})); if (!live()) return;
+    $("#factbox").innerHTML = factboxHTML(facts, d.thumbnail?.source, d.title);
+    if (facts.elevation && !$("#placeElev").textContent) $("#placeElev").textContent = tr("{m} m above sea level", { m: facts.elevation });
+    const named = ((await facts.namedAfterP) || []).map(n => n.label).join(", "); if (!live()) return;
+    if (facts.founded || named) setPoint("s-history", [facts.founded && tr("Founded in {year}.", { year: facts.founded }), named && tr("Named after {who}.", { who: named })].filter(Boolean).join(" "));
+  } catch (err) {
+    S.titlesP = null;
+    if (live()) { box.innerHTML = errHTML(tr("Could not load the encyclopaedia article ({err}).", { err: err.message }), "summary"); $("#factbox").innerHTML = factboxHTML({}, null); }
+  }
+}
+// Main points that need no download, or only data the summary and weather already bring
+function pointsFromPlace() {
+  const n = S.radius / 1000;
+  const P = {
+    "s-plan": tr("A timed day out built from the real places here, fitted to today's weather."),
+    "s-stay": tr("Hotels, guest houses, self-catering and farm stays within {n} km.", { n }),
+    "s-map": tr("Trails, camp sites, farms, peaks, rivers and more on one map."),
+    "s-history": tr("The story of {place}, and historic sites nearby.", { place: S.name }),
+    "s-outdoors": tr("Walking trails, camp sites and picnic spots within {n} km.", { n }),
+    "s-nature": tr("The birds, animals and plants seen most often here, with real bird calls."),
+    "s-climate": tr("Ten years of temperatures and rainfall, month by month."),
+    "s-geology": tr("Rivers and where their names come from, the rocks underfoot and the peaks around."),
+    "s-farms": tr("Farms, wine estates and farm stalls nearby, and how the land is used."),
+    "s-people": tr("People who were born, died or are buried here."),
+    "s-nearby": tr("Places within 10 km that have an encyclopaedia entry."),
+    "s-help": tr("Emergency numbers, and the nearest hospitals, police stations and fuel."),
+    "s-fun": tr("Restaurants, nightlife, things for kids, sport and 4×4 trails.")
+  };
+  for (const [id, t] of Object.entries(P)) setPoint(id, t);
+  const nums = S.country && EMERGENCY[S.country];
+  if (nums) setPoint("s-help", nums.map(([num, what]) => `${num} ${tr(what)}`).join(" · "));
+}
 async function loadWiki(live) {
   for (const id of ["#hist-deep", "#geo-wiki", "#climate-wiki", "#nature-wiki", "#farm-wiki", "#people-wiki", "#ov-name"]) $(id).innerHTML = "";
   try {
-    const r = await resolveTitles(); if (!live()) return;
+    const r = await (S.titlesP ||= resolveTitles()); if (!live()) return;
     if (!r) {
       S.setQid?.(S.wikidata || null);
       $("#ov-intro").innerHTML = `<p class="empty">${tr("No encyclopaedia article found for {place}. The map, nature, climate and geology sections below still cover the area.", { place: esc(S.name) })}</p>`;
@@ -1035,7 +1152,8 @@ async function loadWiki(live) {
     for (const id of ["#ov-facts", "#ov-name", "#hist-wiki", "#hist-deep", "#geo-wiki", "#climate-wiki", "#nature-wiki", "#farm-wiki", "#people-wiki"]) $(id).lang = lang;
 
     // facts box (async wikidata)
-    wikidataFacts(qid).then(f => {
+    factsFor(qid).then(async f => {
+      await f.namedAfterP;
       if (!live()) return;
       $("#factbox").innerHTML = factboxHTML(f, page.thumbnail?.source, title);
       if (f.elevation && !$("#placeElev").textContent) $("#placeElev").textContent = tr("{m} m above sea level", { m: f.elevation });
@@ -1064,7 +1182,7 @@ async function loadWiki(live) {
     put("#farm-wiki", "farm", tr("Economy and agriculture"));
     put("#people-wiki", "people", tr("Notable people"));
   } catch (err) {
-    S.setQid?.(S.wikidata || null);
+    S.setQid?.(S.wikidata || null); S.titlesP = null;
     if (!live()) return;
     $("#ov-intro").innerHTML = errHTML(tr("Could not load the encyclopaedia article ({err}).", { err: err.message }), "wiki");
     $("#hist-wiki").innerHTML = errHTML(tr("Could not load the history."), "wiki");
@@ -1494,6 +1612,8 @@ async function loadWeather(live) {
     const d = await getJSON(`https://api.open-meteo.com/v1/forecast?${qs({ latitude: S.lat, longitude: S.lon, current: "temperature_2m,weather_code,wind_speed_10m", daily: "sunrise,sunset,temperature_2m_max,temperature_2m_min,precipitation_probability_max,weather_code", forecast_days: 1, timezone: "auto" })}`);
     if (!live()) return;
     const dd = d.daily, hm = t => (t || "").slice(11, 16);
+    if (dd?.time?.length) setPoint("s-climate", tr("Today: {min}–{max}°C, {rain}% chance of rain. Sunset {sunset}.", { min: Math.round(dd.temperature_2m_min[0]), max: Math.round(dd.temperature_2m_max[0]), rain: dd.precipitation_probability_max[0] ?? "?", sunset: hm(dd.sunset[0]) }));
+    if (d.elevation != null) setPoint("s-geology", tr("{m} m above sea level. Rivers, rocks and peaks around you.", { m: Math.round(d.elevation) }));
     if (dd?.time?.length) S.today = `Today's forecast: ${wmo(dd.weather_code[0])}, ${Math.round(dd.temperature_2m_min[0])}–${Math.round(dd.temperature_2m_max[0])}°C, ${dd.precipitation_probability_max[0] ?? "unknown"}% chance of rain. Sunrise ${hm(dd.sunrise[0])}, sunset ${hm(dd.sunset[0])}.`;
     const c = d.current; if (!c) return;
     $("#weatherNow").hidden = false;
@@ -1905,6 +2025,7 @@ function renderPlan(planData) {
   $("#planAgain").addEventListener("click", () => $("#planForm").requestSubmit());
   $("#planClear").addEventListener("click", () => { try { localStorage.removeItem(planKey()); } catch {} $("#planResult").innerHTML = ""; layers.plan?.clearLayers(); });
   drawPlan(planData);
+  setPoint("s-plan", tr("Your plan: {title}. Open to see it.", { title: planData.title }));
 }
 function restorePlan() {
   $("#planResult").innerHTML = ""; $("#planStatus").textContent = "";
@@ -2277,7 +2398,7 @@ async function translateSection(sec, st, nodes) {
 }
 function renderXLBar(sec, waiting) {
   const st = secState(sec);
-  let bar = sec.querySelector(":scope > .xl-bar");
+  let bar = sec.querySelector(":scope > .xl-bar, :scope > .sec-body > .xl-bar");
   if (!waiting && !st.pairs.length && !st.busy && !st.failed) { bar?.remove(); return; }
   const lang = UI_LANGS[UILANG];
   const auto = sec.id === "s-overview" ? ` <label class="xl-auto"><input type="checkbox" data-xl-auto ${autoXL() ? "checked" : ""}> ${tr("Translate every section automatically")}</label>` : "";
@@ -2285,7 +2406,11 @@ function renderXLBar(sec, waiting) {
     : !st.on || (st.failed && !st.pairs.length) ? `<button type="button" class="btn" data-xl-go>${tr("Translate into {lang}", { lang })}</button>${st.failed ? ` <span class="err">${tr("Translation didn't work. Try again.")}</span>` : ""}${auto}`
     : `<span>${tr("Translated by AI.")}</span> <button type="button" class="linkish" data-xl-toggle>${st.showing ? tr("Show original") : tr("Show translation")}</button>${st.failed ? ` <span class="err">${tr("Some text couldn't be translated.")}</span> <button type="button" class="linkish" data-xl-go>${tr("Try again")}</button>` : ""}${auto}`;
   if (bar?.dataset.html === html) return;  // nothing changed: leave the page alone
-  if (!bar) { bar = document.createElement("div"); bar.className = "xl-bar ui lang-note"; sec.querySelector("h2").after(bar); }
+  if (!bar) {
+    bar = document.createElement("div"); bar.className = "xl-bar ui lang-note";
+    const body = sec.id !== "s-overview" && sec.querySelector(":scope > .sec-body");
+    body ? body.prepend(bar) : sec.querySelector("h2").after(bar);
+  }
   bar.dataset.html = html; bar.innerHTML = html;
 }
 document.addEventListener("click", e => {
@@ -2318,6 +2443,7 @@ function translatePage() {
   for (const a of ["placeholder", "aria-label", "title"]) document.querySelectorAll(`[${a}]`).forEach(el => { if (el.closest("#uilang")) return; const v = el.getAttribute(a); if (d[v]) el.setAttribute(a, d[v]); });
 }
 translatePage();
+buildAreas();
 document.querySelectorAll("[data-example]").forEach(b => { b.textContent = tr("Try {place}", { place: b.dataset.example }); });
 $("#uilang").value = UILANG;
 $("#uilang").addEventListener("change", e => { store.set("placelore.uilang", e.target.value); location.reload(); });
