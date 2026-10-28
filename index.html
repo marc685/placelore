@@ -824,9 +824,9 @@ function loadPlace(p) {
   try { history.replaceState(null, "", `?q=${encodeURIComponent(p.name)}&lat=${p.lat.toFixed(5)}&lon=${p.lon.toFixed(5)}`); } catch {}
 
   // reset UI
-  const reset = { "#ov-summary": tr("Finding the encyclopaedia entry…"), "#ov-intro": tr("Finding the encyclopaedia entry…"), "#ov-facts": tr("Gathering facts…"), "#hist-wiki": tr("Reading the history…"), "#hist-sites": tr("Searching the map…"), "#rivers": tr("Tracing the waterways…"), "#trails": tr("Loading trails…"), "#camping": tr("Loading camp sites…"), "#picnic": tr("Loading picnic spots…"), "#views": tr("Loading…"), "#nature": tr("Looking for birds and animals…"), "#climate": tr("Crunching ten years of weather…"), "#geology": tr("Reading the geological map…"), "#peaks": tr("Finding peaks…"), "#farms": tr("Finding farms…"), "#nearby": tr("Looking for nearby articles…"), "#stay": tr("Finding places to stay…"), "#people": tr("Looking up notable people…"), "#help-numbers": tr("Checking which country you're in…"), "#fun": tr("Finding things to do…") };
+  const reset = { "#ov-summary": tr("Finding the encyclopaedia entry…"), "#ov-intro": tr("Finding the encyclopaedia entry…"), "#ov-facts": tr("Gathering facts…"), "#hist-wiki": tr("Reading the history…"), "#hist-sites": tr("Searching the map…"), "#rivers": tr("Tracing the waterways…"), "#trails": tr("Loading trails…"), "#camping": tr("Loading camp sites…"), "#picnic": tr("Loading picnic spots…"), "#views": tr("Loading…"), "#nature": tr("Looking for birds and animals…"), "#climate": tr("Crunching ten years of weather…"), "#geology": tr("Reading the geological map…"), "#peaks": tr("Finding peaks…"), "#farms": tr("Finding farms…"), "#nearby": tr("Looking for nearby articles…"), "#stay": tr("Finding places to stay…"), "#people": tr("Looking up notable people…"), "#help-numbers": tr("Checking which country you're in…"), "#fun": tr("Finding things to do…"), "#help-places": tr("Finding the nearest help…") };
   for (const [k, v] of Object.entries(reset)) $(k).innerHTML = loading(v);
-  for (const k of ["#ov-name", "#hist-deep", "#nature-wiki", "#climate-wiki", "#geo-wiki", "#farm-wiki", "#landuse", "#people-wiki", "#help-places"]) $(k).innerHTML = "";
+  for (const k of ["#ov-name", "#hist-deep", "#nature-wiki", "#climate-wiki", "#geo-wiki", "#farm-wiki", "#landuse", "#people-wiki"]) $(k).innerHTML = "";
   for (const k of ["#c-trails", "#c-camp", "#c-picnic", "#c-view", "#c-peaks"]) $(k).textContent = "";
   $("#factbox").innerHTML = `<dl><dt>${tr("Loading")}</dt><dd>…</dd></dl>`;
   setLinks();
@@ -848,11 +848,13 @@ function loadPlace(p) {
   restorePlan();
   RETRY.summary = () => loadSummary(live); RETRY.summary();
   loadWeather(live);
-  RETRY.wiki = () => loadWiki(live); RETRY.osm = () => loadOSM(live); RETRY.extra = () => loadExtra(live);
+  RETRY.wiki = () => loadWiki(live); RETRY.osm = () => loadOSM(live);
+  for (const part of ["stay", "fun", "help"]) RETRY["extra_" + part] = () => loadExtra(live, part);
   RETRY.nature = () => loadNature(live); RETRY.climate = () => loadClimate(live); RETRY.geo = () => loadGeology(live);
   RETRY.nearby = () => loadNearby(live); RETRY.people = () => loadPeople(live); RETRY.help = () => loadHelp(live);
   RUN = {
-    wiki: once(RETRY.wiki), osm: once(RETRY.osm), extra: once(RETRY.extra), nature: once(RETRY.nature),
+    wiki: once(RETRY.wiki), osm: once(RETRY.osm), nature: once(RETRY.nature),
+    stay: once(RETRY.extra_stay), fun: once(RETRY.extra_fun), helpPlaces: once(RETRY.extra_help),
     climate: once(RETRY.climate), geo: once(RETRY.geo), nearby: once(RETRY.nearby), people: once(RETRY.people),
     help: once(RETRY.help), paths: () => { if ($("#lt-paths")?.checked) loadUnnamedPaths(); }
   };
@@ -862,10 +864,10 @@ function loadPlace(p) {
 /* ---------- areas open one at a time ---------- */
 let RUN = {};
 const AREA_LOADS = {
-  "s-overview": ["wiki"], "s-plan": [], "s-stay": ["extra"], "s-map": ["osm", "extra", "nearby", "paths"],
+  "s-overview": ["wiki"], "s-plan": [], "s-stay": ["stay"], "s-map": ["osm", "paths"],
   "s-history": ["wiki", "osm"], "s-outdoors": ["osm", "paths"], "s-nature": ["nature", "wiki"], "s-climate": ["climate", "wiki"],
   "s-geology": ["osm", "geo", "wiki"], "s-farms": ["osm", "wiki"], "s-people": ["people", "wiki"], "s-nearby": ["nearby"],
-  "s-help": ["help", "extra"], "s-fun": ["extra"]
+  "s-help": ["help", "helpPlaces"], "s-fun": ["fun"]
 };
 // Every area except the overview gets a heading line with its main point and a Read more button
 function buildAreas() {
@@ -1221,7 +1223,7 @@ async function overpass(q) {
     let last;
     // The app's own server relays with retries and a cache; the public servers directly are the fallback
     if (location.protocol.startsWith("http")) {
-      try { return await getJSON("/api/overpass", { method: "POST", body: "data=" + encodeURIComponent(q), headers: { "Content-Type": "application/x-www-form-urlencoded" } }, 200000); }
+      try { return await getJSON("/api/overpass", { method: "POST", body: "data=" + encodeURIComponent(q), headers: { "Content-Type": "application/x-www-form-urlencoded" } }, 75000); }
       catch (e) { last = e; if (!navigator.onLine || [429, 502].includes(e.status)) throw e; } // the server already tried every mirror
     }
     for (let k = 0; k < OVERPASS.length; k++) {
@@ -1277,6 +1279,7 @@ way["landuse"="meadow"]${a};out count;
 way["landuse"~"^(greenhouse_horticulture|plant_nursery)$"]${a};out count;
 way["landuse"="forest"]${a};out count;`;
 
+  stillLooking("#trails", live); stillLooking("#camping", live);
   const linesP = overpass(qLines).then(d => { if (live()) renderLines(d.elements || []); })
     .catch(err => { if (!live()) return; $("#trails").innerHTML = errHTML(tr("Trail data did not load ({err}). The map servers may be busy.", { err: err.message }), "osm"); $("#rivers").innerHTML = errHTML(tr("River data did not load."), "osm"); });
   const poiP = overpass(qPoi).then(d => { if (live()) renderPOIs(d.elements || []); })
@@ -1794,20 +1797,35 @@ function contactLinks(el, t, c) {
 }
 const mapSearch = q => `https://www.google.com/maps/search/${encodeURIComponent(q)}/@${S.lat},${S.lon},12z`;
 
-async function loadExtra(live) {
+// Places to stay, recreation and nearest help each have their own small query, so opening one
+// area doesn't wait for the others
+const PART_BOX = { stay: "#stay", fun: "#fun", help: "#help-places" };
+function stillLooking(sel, live) {
+  setTimeout(() => {
+    const el = $(sel);
+    if (live() && el?.querySelector(":scope > .loading") && !el.querySelector(".slow-note"))
+      el.insertAdjacentHTML("beforeend", `<p class="lang-note slow-note">${tr("The map servers are slow right now. Still looking…")}</p>`);
+  }, 6000);
+}
+async function loadExtra(live, part) {
   const a = `(${bbox(S.lat, S.lon, S.radius)})`;
-  const q = `[out:json][timeout:45];
-(
-  nwr["tourism"~"^(hotel|motel|hostel|guest_house|apartment|chalet|farmstay)$"]${a};
-  nwr["accommodation"="farmstay"]${a};
-  nwr["amenity"~"^(restaurant|cafe|bar|pub|nightclub|biergarten|cinema|theatre|arts_centre|hospital|clinic|doctors|police|pharmacy|fuel)$"]${a};
+  const clauses = {
+    stay: `nwr["tourism"~"^(hotel|motel|hostel|guest_house|apartment|chalet|farmstay)$"]${a};
+  nwr["accommodation"="farmstay"]${a};`,
+    fun: `nwr["amenity"~"^(restaurant|cafe|bar|pub|nightclub|biergarten|cinema|theatre|arts_centre)$"]${a};
   nwr["leisure"~"^(playground|water_park|amusement_arcade|miniature_golf|trampoline_park|golf_course|sports_centre|stadium|fitness_centre|horse_riding|marina|ice_rink)$"]${a};
   nwr["leisure"="swimming_pool"]["name"]${a};
   nwr["tourism"~"^(zoo|theme_park|aquarium)$"]${a};
   nwr["sport"~"squash|tennis|4wd|offroad|off_road"]${a};
-  relation["route"~"^(4wd|offroad|off-road)$"]${a};
+  relation["route"~"^(4wd|offroad|off-road)$"]${a};`,
+    help: `nwr["amenity"~"^(hospital|clinic|doctors|police|pharmacy|fuel)$"]${a};`
+  };
+  const q = `[out:json][timeout:30];
+(
+  ${clauses[part]}
 );
 out tags center qt;`;
+  stillLooking(PART_BOX[part], live);
   try {
     const d = await overpass(q); if (!live()) return;
     const stay = {}, fun = {}, help = {};
@@ -1839,6 +1857,7 @@ out tags center qt;`;
       (fun[fk] ||= []).push({ id, name: name || label.charAt(0).toUpperCase() + label.slice(1), sub, right: km(dist), dist, links: contactLinks(el, t, c) });
     }
     for (const [k, arr] of Object.entries(stay)) candFromMarkers("place to stay: " + STAY_GROUPS.find(g => g.k === k).label, arr);
+    if (part === "help") return renderHelpPlaces(help);
     for (const [k, arr] of Object.entries(fun)) candFromMarkers(FUN_GROUPS.find(g => g.k === k).label, arr);
     const groupHTML = (groups, data, key, max, emptyAll) => {
       let total = 0;
@@ -1850,18 +1869,19 @@ out tags center qt;`;
       }).join("");
       return (total ? "" : `<p class="empty">${emptyAll}</p>`) + `<div class="cols">${html}</div>`;
     };
-    $("#stay").innerHTML = groupHTML(STAY_GROUPS, stay, "stay", 6, tr("No places to stay are mapped nearby. Try a bigger radius or the search links below."));
-    $("#fun").innerHTML = `${groupHTML(FUN_GROUPS, fun, "fun", 6, tr("Nothing mapped nearby yet. Try a bigger radius."))}
+    if (part === "stay") $("#stay").innerHTML = groupHTML(STAY_GROUPS, stay, "stay", 6, tr("No places to stay are mapped nearby. Try a bigger radius or the search links below."));
+    if (part === "fun") $("#fun").innerHTML = `${groupHTML(FUN_GROUPS, fun, "fun", 6, tr("Nothing mapped nearby yet. Try a bigger radius."))}
       <div class="links">${linkBtns([[tr("Live music & events"), `https://www.google.com/search?q=${encodeURIComponent(`live music events ${S.name} this week`)}`], [tr("What's on"), `https://www.google.com/search?q=${encodeURIComponent(`what's on in ${S.name}`)}`]])}</div>`;
-    $("#help-places").innerHTML = `<h3>${tr("Nearest help")}</h3><div class="cols">${HELP_GROUPS.map(g => {
-      const arr = (help[g.k] || []).sort((a, b) => a.dist - b.dist);
-      return `<div><h4>${esc(g.label)}</h4>${itemsList(arr, "help", 3) || `<p class="empty">${tr("None mapped within {n} km.", { n: S.radius / 1000 })}</p>`}<div class="links" style="margin-top:6px">${linkBtns([[tr("Search nearby"), mapSearch(g.search)]])}</div></div>`;
-    }).join("")}</div>`;
   } catch (err) {
     if (!live()) return;
-    for (const s of ["#stay", "#fun"]) $(s).innerHTML = errHTML(tr("Map data did not load ({err}). The map servers may be busy.", { err: err.message }), "extra");
-    $("#help-places").innerHTML = "";
+    $(PART_BOX[part]).innerHTML = errHTML(tr("Map data did not load ({err}). The map servers may be busy.", { err: err.message }), "extra_" + part);
   }
+}
+function renderHelpPlaces(help) {
+  $("#help-places").innerHTML = `<h3>${tr("Nearest help")}</h3><div class="cols">${HELP_GROUPS.map(g => {
+    const arr = (help[g.k] || []).sort((a, b) => a.dist - b.dist);
+    return `<div><h4>${esc(g.label)}</h4>${itemsList(arr, "help", 3) || `<p class="empty">${tr("None mapped within {n} km.", { n: S.radius / 1000 })}</p>`}<div class="links" style="margin-top:6px">${linkBtns([[tr("Search nearby"), mapSearch(g.search)]])}</div></div>`;
+  }).join("")}</div>`;
 }
 
 /* ---------- emergency numbers: only once the country is known ---------- */

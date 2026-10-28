@@ -611,5 +611,7 @@ window.I18N.af = {
  "Emergency numbers, and the nearest hospitals, police stations and fuel.": "Noodnommers, en die naaste hospitale, polisiekantore en brandstof.",
  "Restaurants, nightlife, things for kids, sport and 4×4 trails.": "Restaurante, naglewe, dinge vir kinders, sport en 4×4-roetes.",
  "Today: {min}–{max}°C, {rain}% chance of rain. Sunset {sunset}.": "Vandag: {min}–{max}°C, {rain}% kans op reën. Sonsondergang {sunset}.",
- "{m} m above sea level. Rivers, rocks and peaks around you.": "{m} m bo seevlak. Riviere, rotse en pieke rondom jou."
+ "{m} m above sea level. Rivers, rocks and peaks around you.": "{m} m bo seevlak. Riviere, rotse en pieke rondom jou.",
+ "The map servers are slow right now. Still looking…": "Die kaartbedieners is nou stadig. Soek steeds…",
+ "Finding the nearest help…": "Soek die naaste hulp…"
 };

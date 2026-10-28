@@ -248,8 +248,9 @@ const CACHE_MS = 6 * 3600_000, CACHE_MAX = 300;
 function cached(key) { const hit = cache.get(key); if (hit && Date.now() - hit.at < CACHE_MS) return hit.body; cache.delete(key); }
 function remember(key, body) { cache.set(key, { at: Date.now(), body }); if (cache.size > CACHE_MAX) cache.delete(cache.keys().next().value); }
 const sleep = ms => new Promise(r => setTimeout(r, ms));
-async function tryFetch(url, init, ms) {
+async function tryFetch(url, init, ms, signal) {
   const c = new AbortController(), t = setTimeout(() => c.abort(), ms);
+  signal?.addEventListener("abort", () => c.abort());
   try {
     const r = await fetch(url, { ...init, signal: c.signal });
     const text = await r.text();
@@ -257,6 +258,24 @@ async function tryFetch(url, init, ms) {
     JSON.parse(text); // Overpass sometimes answers 200 with an HTML error page
     return text;
   } finally { clearTimeout(t); }
+}
+// Start the next server if the current one is slow (or at once if it fails); the first answer wins
+// and the others are cancelled
+function race(attempts, staggerMs) {
+  const stop = new AbortController();
+  return new Promise((resolve, reject) => {
+    let next = 0, running = 0, finished = false, last;
+    const launch = () => {
+      if (finished || next >= attempts.length) return;
+      const i = next++; running++;
+      const timer = setTimeout(launch, staggerMs);
+      attempts[i](stop.signal)
+        .then(body => { if (!finished) { finished = true; clearTimeout(timer); stop.abort(); resolve(body); } })
+        .catch(e => { last = e; clearTimeout(timer); launch(); })
+        .finally(() => { running--; if (!finished && !running && next >= attempts.length) { finished = true; reject(last); } });
+    };
+    launch();
+  });
 }
 const relayHits = new Map();
 function relayLimited(ip) {
@@ -275,24 +294,19 @@ async function relay(req, res, kind) {
     if (body.length > 20_000 || !body.startsWith("data=")) return send(400, JSON.stringify({ error: "bad query" }));
     key = "o:" + body;
     const init = { method: "POST", body, headers: { "Content-Type": "application/x-www-form-urlencoded", "User-Agent": UA } };
-    attempts = OVERPASS.map(u => () => tryFetch(u, init, 60_000));
+    attempts = OVERPASS.map(u => signal => tryFetch(u, init, 45_000, signal));
   } else {
     const q = new URL(req.url, "http://x").searchParams.get("query") || "";
     if (!q || q.length > 8000) return send(400, JSON.stringify({ error: "bad query" }));
     key = "w:" + q;
     const url = "https://query.wikidata.org/sparql?" + new URLSearchParams({ format: "json", query: q });
     const init = { headers: { Accept: "application/sparql-results+json", "User-Agent": UA } };
-    attempts = [() => tryFetch(url, init, 65_000)]; // Wikidata's own limit is 60 s; the browser falls back to a quicker query
+    attempts = [signal => tryFetch(url, init, 65_000, signal)]; // Wikidata's own limit is 60 s; the browser falls back to a quicker query
   }
   const hit = cached(key); if (hit) return send(200, hit);
   let last;
-  for (let round = 0; round < (kind === "overpass" ? 2 : 1); round++) {
-    if (round) await sleep(4000);
-    for (const attempt of attempts) {
-      try { const body = await attempt(); remember(key, body); return send(200, body); }
-      catch (e) { last = e; }
-    }
-  }
+  try { const body = await race(attempts, 4000); remember(key, body); return send(200, body); }
+  catch (e) { last = e; }
   console.error(`${kind} relay failed`, last?.status || last?.name || last?.message);
   send(502, JSON.stringify({ error: last?.name === "AbortError" ? "timeout" : "upstream " + (last?.status || "error") }));
 }

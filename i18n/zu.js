@@ -581,5 +581,7 @@ window.I18N.zu = {
  "Emergency numbers, and the nearest hospitals, police stations and fuel.": "Izinombolo eziphuthumayo, nezibhedlela, iziteshi zamaphoyisa nophethiloli oseduze.",
  "Restaurants, nightlife, things for kids, sport and 4×4 trails.": "Izindawo zokudlela, impilo yasebusuku, izinto zezingane, ezemidlalo nemizila ye-4×4.",
  "Today: {min}–{max}°C, {rain}% chance of rain. Sunset {sunset}.": "Namuhla: {min}–{max}°C, {rain}% amathuba emvula. Ukushona kwelanga {sunset}.",
- "{m} m above sea level. Rivers, rocks and peaks around you.": "{m} m ngaphezu kolwandle. Imifula, amatshe neziqongo ezikuzungezile."
+ "{m} m above sea level. Rivers, rocks and peaks around you.": "{m} m ngaphezu kolwandle. Imifula, amatshe neziqongo ezikuzungezile.",
+ "The map servers are slow right now. Still looking…": "Amaseva emephu ahamba kancane njengamanje. Sisafuna…",
+ "Finding the nearest help…": "Ithola usizo oluseduze…"
 };

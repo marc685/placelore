@@ -581,5 +581,7 @@ window.I18N.st = {
  "Emergency numbers, and the nearest hospitals, police stations and fuel.": "Dinomoro tsa tshohanyetso, le dipetlele, diteishene tsa sepolesa le peterole tse haufi.",
  "Restaurants, nightlife, things for kids, sport and 4×4 trails.": "Direschorente, bophelo ba bosiu, dintho tsa bana, dipapadi le ditsela tsa 4×4.",
  "Today: {min}–{max}°C, {rain}% chance of rain. Sunset {sunset}.": "Kajeno: {min}–{max}°C, monyetla wa pula wa {rain}%. Ho dikela ha letsatsi {sunset}.",
- "{m} m above sea level. Rivers, rocks and peaks around you.": "{m} m ka hodima bophahamo ba lewatle. Dinoka, majwe le ditlhoro tse o potapotileng."
+ "{m} m above sea level. Rivers, rocks and peaks around you.": "{m} m ka hodima bophahamo ba lewatle. Dinoka, majwe le ditlhoro tse o potapotileng.",
+ "The map servers are slow right now. Still looking…": "Diseva tsa mmapa di dieha hona jwale. Re ntse re batla…",
+ "Finding the nearest help…": "E batla thuso e haufi…"
 };
