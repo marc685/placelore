@@ -5,6 +5,7 @@ import http from "node:http";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import zlib from "node:zlib";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 8080;
@@ -265,7 +266,7 @@ function relayLimited(ip) {
 }
 async function relay(req, res, kind) {
   const ip = (req.headers["x-forwarded-for"] || req.socket.remoteAddress || "").split(",")[0].trim();
-  const send = (code, body) => { res.writeHead(code, { "Content-Type": "application/json", "Cache-Control": code === 200 ? "public, max-age=3600" : "no-store" }); res.end(body); };
+  const send = (code, body) => sendCompressed(req, res, code, { "Content-Type": "application/json", "Cache-Control": code === 200 ? "public, max-age=3600" : "no-store" }, Buffer.from(body));
   if (relayLimited(ip)) return send(429, JSON.stringify({ error: "too many requests" }));
   let key, attempts;
   if (kind === "overpass") {
@@ -297,14 +298,30 @@ async function relay(req, res, kind) {
 }
 
 const TYPES = { ".html": "text/html; charset=utf-8", ".js": "text/javascript", ".css": "text/css", ".json": "application/json", ".webmanifest": "application/manifest+json", ".png": "image/png", ".svg": "image/svg+xml" };
+// Text is gzipped when the browser accepts it: the page and map data shrink to about a third
+const gzipOK = req => /\bgzip\b/.test(req.headers["accept-encoding"] || "");
+function sendCompressed(req, res, code, headers, body, gz) {
+  if (gzipOK(req) && body.length > 1024) {
+    res.writeHead(code, { ...headers, "Content-Encoding": "gzip", "Vary": "Accept-Encoding" });
+    return res.end(gz || zlib.gzipSync(body));
+  }
+  res.writeHead(code, { ...headers, "Vary": "Accept-Encoding" }); res.end(body);
+}
+const staticFiles = new Map(); // the app's files never change inside a running container
 async function serveStatic(req, res) {
   const url = new URL(req.url, "http://x");
   let file = path.normalize(decodeURIComponent(url.pathname)).replace(/^(\.\.[/\\])+/, "");
   if (file === "/" || !path.extname(file)) file = "/index.html";
   try {
-    const data = await readFile(path.join(here, "public", file));
-    res.writeHead(200, { "Content-Type": TYPES[path.extname(file)] || "application/octet-stream", "Cache-Control": "no-cache" });
-    res.end(data);
+    let f = staticFiles.get(file);
+    if (!f) {
+      const data = await readFile(path.join(here, "public", file)), type = TYPES[path.extname(file)] || "application/octet-stream";
+      f = { data, type, gz: /^(text|application\/(json|manifest))/.test(type) || type === "text/javascript" ? zlib.gzipSync(data, { level: 9 }) : null };
+      staticFiles.set(file, f);
+    }
+    const headers = { "Content-Type": f.type, "Cache-Control": "no-cache" };
+    if (f.gz) return sendCompressed(req, res, 200, headers, f.data, f.gz);
+    res.writeHead(200, headers); res.end(f.data);
   } catch {
     res.writeHead(404, { "Content-Type": "text/plain" }); res.end("Not found");
   }

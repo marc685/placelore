@@ -3,7 +3,8 @@ WORKDIR /app
 COPY package.json ./
 RUN npm install --omit=dev --no-audit --no-fund
 COPY server.js ./
-COPY index.html i18n.js sw.js manifest.webmanifest icon-192.png icon-512.png ./public/
+COPY index.html sw.js manifest.webmanifest icon-192.png icon-512.png ./public/
+COPY i18n ./public/i18n
 ENV PORT=8080
 EXPOSE 8080
 USER node

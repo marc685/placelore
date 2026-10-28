@@ -1,7 +1,7 @@
 // Placelore service worker: keeps the app itself, map tiles and photos on the device
 // so saved places open without signal. Place data lives in IndexedDB (see index.html).
-const SHELL = "placelore-shell-v2", TILES = "placelore-tiles-v1", MEDIA = "placelore-media-v1";
-const SHELL_URLS = ["/", "/i18n.js", "/manifest.webmanifest", "/icon-192.png", "/icon-512.png",
+const SHELL = "placelore-shell-v3", TILES = "placelore-tiles-v1", MEDIA = "placelore-media-v1";
+const SHELL_URLS = ["/", "/manifest.webmanifest", "/icon-192.png", "/icon-512.png",
   "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js",
   "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"];
 const TILE_HOSTS = /(^|\.)(tile\.openstreetmap\.org|tile\.opentopomap\.org|server\.arcgisonline\.com|tile\.waymarkedtrails\.org)$/;

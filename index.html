@@ -515,7 +515,14 @@ footer{padding-block:24px 40px;color:var(--muted);font-size:.85rem}
   </form>
 </div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
-<script src="i18n.js"></script>
+<script>
+// Only the chosen language's text is downloaded; English needs none
+(function () {
+  var l; try { l = JSON.parse(localStorage.getItem("placelore.uilang")); } catch (e) {}
+  if (!l) { var n = (navigator.language || "").slice(0, 2).toLowerCase(); if (["af", "st", "zu"].indexOf(n) >= 0) l = n; }
+  if (["af", "st", "zu"].indexOf(l) >= 0) document.write('<script src="i18n/' + l + '.js"><\/script>');
+})();
+</script>
 <script>
 "use strict";
 /* ---------- helpers ---------- */
@@ -638,7 +645,7 @@ const LAYERS = [
 /* ---------- map ---------- */
 function initMap() {
   if (map) return;
-  map = L.map("map", { zoomControl: true });
+  map = L.map("map", { zoomControl: true, preferCanvas: true });
   const osm = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "© OpenStreetMap contributors" });
   const topo = L.tileLayer("https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png", { maxZoom: 17, attribution: "© OpenStreetMap contributors, SRTM | © OpenTopoMap (CC-BY-SA)" });
   const sat = L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", { maxZoom: 19, attribution: "Imagery © Esri" });
@@ -813,16 +820,40 @@ function loadPlace(p) {
   setTimeout(() => map.invalidateSize(), 50);
   window.scrollTo({ top: 0 });
 
+  // The overview, map data and weather load now; the rest loads as it scrolls into view
+  initLazy();
   (RETRY.wiki = () => loadWiki(live))();
   (RETRY.osm = () => loadOSM(live))();
-  (RETRY.nature = () => loadNature(live))();
-  (RETRY.climate = () => loadClimate(live))();
-  (RETRY.geo = () => loadGeology(live))();
-  (RETRY.nearby = () => loadNearby(live))();
-  (RETRY.extra = () => loadExtra(live))();
-  (RETRY.people = () => loadPeople(live))();
-  loadHelp(live);
   loadWeather(live);
+  RETRY.nature = () => loadNature(live); lazy("s-nature", RETRY.nature);
+  RETRY.climate = () => loadClimate(live); lazy("s-climate", RETRY.climate);
+  RETRY.geo = () => loadGeology(live); lazy("geology", RETRY.geo);
+  RETRY.nearby = () => loadNearby(live); lazy("s-nearby", RETRY.nearby);
+  RETRY.people = () => loadPeople(live); lazy("s-people", RETRY.people);
+  RETRY.extra = () => loadExtra(live);
+  const extraOnce = once(RETRY.extra);  // one query serves stay, recreation and nearest help
+  lazy("s-stay", extraOnce); lazy("s-fun", extraOnce); lazy("help-places", extraOnce);
+  lazy("help-numbers", () => loadHelp(live));
+}
+
+/* ---------- loading sections on demand ---------- */
+const once = f => { let done = false; return () => { if (!done) { done = true; f(); } }; };
+let lazyObs = null, lazyRun = new Map();
+function initLazy() {
+  lazyObs?.disconnect(); lazyRun = new Map();
+  lazyObs = new IntersectionObserver(entries => {
+    for (const e of entries) if (e.isIntersecting) { const fns = lazyRun.get(e.target.id); lazyRun.delete(e.target.id); lazyObs.unobserve(e.target); fns?.forEach(f => f()); }
+  }, { rootMargin: "700px 0px" });
+}
+function lazy(id, fn) {
+  const el = document.getElementById(id); if (!el) return fn();
+  if (!lazyRun.has(id)) { lazyRun.set(id, []); lazyObs.observe(el); }
+  lazyRun.get(id).push(fn);
+}
+// Planning, saving for offline and the assistant need everything, so they load what's left
+function loadEverything() {
+  const all = [...lazyRun.values()].flat(); lazyRun.clear(); lazyObs?.disconnect();
+  all.forEach(f => f());
 }
 
 function setLinks(title, lang = "en") {
@@ -1319,7 +1350,12 @@ function renderRivers(list) {
     const id = "rv" + i; markerIndex[id] = L.polyline(r.segs);
     return `<div class="river" id="river-${i}"><h4 class="ui">${esc(r.name)}</h4><div class="sub ui" style="color:var(--muted);font-size:.9rem">${tr(r.kind === "river" ? "River" : r.kind === "canal" ? "Canal" : "Stream")} · ${tr("{d} within the area", { d: km(r.len) })} · <button type="button" class="linkish" data-focus="${id}" style="background:none;border:0;padding:0;color:var(--pine);text-decoration:underline;cursor:pointer;font:inherit">${tr("Show on map")}</button></div><div class="origin">${loading(tr("Looking up the name…"))}</div></div>`;
   }).join("") + (rest.length ? `<details class="more showall"><summary>${tr("{n} more named streams", { n: rest.length })}</summary><p>${rest.map(r => esc(r.name)).join(" · ")}</p></details>` : "");
-  top.forEach((r, i) => {
+  const stories = top.slice(0, 6);
+  top.slice(6).forEach((r, i) => {
+    const el = document.querySelector(`#river-${i + 6} .origin`);
+    if (el) el.innerHTML = `<div class="links" style="margin-top:6px">${linkBtns([[tr("Search the name's origin"), `https://www.google.com/search?q=${encodeURIComponent(`${r.name} name origin meaning`)}`]])}</div>`;
+  });
+  lazy("rivers", () => stories.forEach((r, i) => {
     riverStory(r).then(o => {
       if (my !== token) return;
       const el = document.querySelector(`#river-${i} .origin`); if (!el) return;
@@ -1335,7 +1371,7 @@ function renderRivers(list) {
         o.textLang && o.textLang !== o.lang && [tr("Wikipedia (Afrikaans)"), wikiUrl(o.textTitle, "af")], [tr("Search the name's origin"), `https://www.google.com/search?q=${encodeURIComponent(`${r.name} name origin meaning`)}`]];
       el.innerHTML = bits.join("") + `<div class="links" style="margin-top:6px">${linkBtns(links)}</div>`;
     }).catch(() => { const el = document.querySelector(`#river-${i} .origin`); if (el) el.innerHTML = `<p class="empty">${tr("Could not look up this name.")}</p>`; });
-  });
+  }));
 }
 
 /* ---------- nature (iNaturalist) ---------- */
@@ -1360,7 +1396,6 @@ async function loadNature(live) {
     tabs.querySelectorAll("button").forEach(x => x.setAttribute("aria-selected", x === b)); showGroup(b.dataset.g, live);
   }));
   showGroup("birds", live);
-  GROUPS.forEach(g => fetchGroup(g).catch(() => {}));
 }
 function fetchGroup(g) {
   if (natureCache[g.key]) return natureCache[g.key];
@@ -1855,6 +1890,7 @@ $("#planForm").addEventListener("submit", async e => {
   if (!prefs.interests.length) { $("#planStatus").textContent = tr("Pick at least one interest."); return; }
   go.disabled = true;
   $("#planStatus").textContent = tr("Gathering places from the page…");
+  loadEverything();
   await whenIdle(20000);
   if (place !== S) return;
   const candidates = candidateText();
@@ -1964,7 +2000,8 @@ $("#saveOffline").addEventListener("click", async () => {
   btn.disabled = true;
   try {
     $("#saveStatus").textContent = tr("Waiting for every section to finish loading…");
-    await Promise.allSettled(Object.values(natureCache));
+    loadEverything();
+    await Promise.allSettled(GROUPS.map(g => fetchGroup(g)));
     await whenIdle(90000);
     if (place !== S) return;
     const responses = Object.fromEntries(RECORD);
@@ -2096,6 +2133,7 @@ async function sendChat(text) {
   chatMsgs.push({ role: "user", content: text }, { role: "assistant", content: "" });
   renderChat();
   const bubble = $("#chatLog").lastElementChild; bubble.textContent = tr("Thinking…");
+  await whenIdle(8000);  // sections opened by the chat button are still arriving
   const key = chatKey, reply = chatMsgs[chatMsgs.length - 1];
   chatAbort = new AbortController();
   try {
@@ -2117,7 +2155,7 @@ async function sendChat(text) {
     chatBusy = false; $("#chatSend").disabled = false; chatAbort = null;
   }
 }
-$("#askFab").addEventListener("click", () => { $("#chat").hidden = false; $("#askFab").hidden = true; $("#chatInput").focus(); });
+$("#askFab").addEventListener("click", () => { loadEverything(); $("#chat").hidden = false; $("#askFab").hidden = true; $("#chatInput").focus(); });
 $("#chatClose").addEventListener("click", () => { $("#chat").hidden = true; $("#askFab").hidden = false; stopMic(); });
 $("#chatClear").addEventListener("click", () => { if (chatAbort) chatAbort.abort(); chatMsgs = []; store.set(chatKey, []); renderChat(); });
 $("#chatForm").addEventListener("submit", e => { e.preventDefault(); stopMic(); sendChat($("#chatInput").value); });
