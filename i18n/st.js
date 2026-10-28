@@ -583,5 +583,9 @@ window.I18N.st = {
  "Today: {min}–{max}°C, {rain}% chance of rain. Sunset {sunset}.": "Kajeno: {min}–{max}°C, monyetla wa pula wa {rain}%. Ho dikela ha letsatsi {sunset}.",
  "{m} m above sea level. Rivers, rocks and peaks around you.": "{m} m ka hodima bophahamo ba lewatle. Dinoka, majwe le ditlhoro tse o potapotileng.",
  "The map servers are slow right now. Still looking…": "Diseva tsa mmapa di dieha hona jwale. Re ntse re batla…",
- "Finding the nearest help…": "E batla thuso e haufi…"
+ "Finding the nearest help…": "E batla thuso e haufi…",
+ "Also search within {n} km (can take a minute)": "Batla le ka hara {n} km (ho ka nka motsotso)",
+ "Searching within {n} km… Wikidata can take up to a minute for this.": "E batla ka hara {n} km… Wikidata e ka nka ho fihla motsotsong bakeng sa sena.",
+ "Placelore covers South Africa only. You can still search for a South African town.": "Placelore e akaretsa Afrika Borwa feela. O ntse o ka batla toropo ya Afrika Borwa.",
+ "No place in South Africa called “{q}”. Check the spelling.": "Ha ho sebaka Afrika Borwa se bitswang “{q}”. Hlahloba mopeleto."
 };

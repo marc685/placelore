@@ -583,5 +583,9 @@ window.I18N.zu = {
  "Today: {min}–{max}°C, {rain}% chance of rain. Sunset {sunset}.": "Namuhla: {min}–{max}°C, {rain}% amathuba emvula. Ukushona kwelanga {sunset}.",
  "{m} m above sea level. Rivers, rocks and peaks around you.": "{m} m ngaphezu kolwandle. Imifula, amatshe neziqongo ezikuzungezile.",
  "The map servers are slow right now. Still looking…": "Amaseva emephu ahamba kancane njengamanje. Sisafuna…",
- "Finding the nearest help…": "Ithola usizo oluseduze…"
+ "Finding the nearest help…": "Ithola usizo oluseduze…",
+ "Also search within {n} km (can take a minute)": "Sesha nangaphakathi kuka-{n} km (kungathatha umzuzu)",
+ "Searching within {n} km… Wikidata can take up to a minute for this.": "Isesha ngaphakathi kuka-{n} km… I-Wikidata ingathatha umzuzu kulokhu.",
+ "Placelore covers South Africa only. You can still search for a South African town.": "I-Placelore ihlanganisa iNingizimu Afrika kuphela. Usengasesha idolobha laseNingizimu Afrika.",
+ "No place in South Africa called “{q}”. Check the spelling.": "Ayikho indawo eNingizimu Afrika ebizwa ngokuthi “{q}”. Hlola ukupela."
 };

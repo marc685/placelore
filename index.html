@@ -309,7 +309,7 @@ section.open .read-more{background:var(--pine-soft);border-color:var(--pine)}
     <button class="btn primary" type="button" id="gpsBtn2">Use my location</button>
     <button class="btn" type="button" data-example="Stellenbosch">Try Stellenbosch</button>
     <button class="btn" type="button" data-example="Franschhoek">Try Franschhoek</button>
-    <button class="btn" type="button" data-example="Grindelwald">Try Grindelwald</button>
+    <button class="btn" type="button" data-example="Clarens">Try Clarens</button>
   </div>
   <div class="recent" id="packs" hidden>
     <div class="eyebrow">Saved for offline</div>
@@ -483,8 +483,8 @@ section.open .read-more{background:var(--pine-soft);border-color:var(--pine)}
     <section id="s-people">
       <h2>Famous people</h2>
       <p class="lede">People with an encyclopaedia entry who were born, died or are buried in or near this place.</p>
-      <div id="people" data-xl><p class="loading">Looking up notable people…</p></div>
       <div id="people-wiki" data-xl></div>
+      <div id="people" data-xl><p class="loading">Looking up notable people…</p></div>
     </section>
 
     <section id="s-nearby">
@@ -728,7 +728,8 @@ function placeFromNominatim(r) {
   };
 }
 async function searchPlaces(q) {
-  return getJSON(`${NOM}/search?${qs({ q, format: "jsonv2", limit: 6, extratags: 1, addressdetails: 1, "accept-language": `${UILANG},en` })}`);
+  // Placelore covers South Africa only
+  return getJSON(`${NOM}/search?${qs({ q, format: "jsonv2", limit: 6, extratags: 1, addressdetails: 1, countrycodes: "za", "accept-language": `${UILANG},en` })}`);
 }
 async function reverse(lat, lon) {
   const r = await getJSON(`${NOM}/reverse?${qs({ lat, lon, format: "jsonv2", zoom: 12, extratags: 1, addressdetails: 1, "accept-language": `${UILANG},en` })}`);
@@ -763,7 +764,7 @@ $("#searchForm").addEventListener("submit", async e => {
     const res = (await searchPlaces(q)).map((r, i) => ({ r, i })).sort((a, b) => rank(a.r) - rank(b.r) || a.i - b.i).map(x => x.r);
     const exact = res.find(r => rank(r) === 0 && (r.name || "").toLowerCase() === q.toLowerCase().split(",")[0].trim());
     if (exact && res.filter(r => rank(r) === 0 && (r.name || "").toLowerCase() === exact.name.toLowerCase()).length === 1) { sug.hidden = true; return loadPlace(placeFromNominatim(exact)); }
-    if (!res.length) { sug.innerHTML = `<button type="button" disabled>${tr("No place found called “{q}”. Check the spelling or add the country.", { q: esc(q) })}</button>`; return; }
+    if (!res.length) { sug.innerHTML = `<button type="button" disabled>${tr("No place in South Africa called “{q}”. Check the spelling.", { q: esc(q) })}</button>`; return; }
     if (res.length === 1) { sug.hidden = true; return loadPlace(placeFromNominatim(res[0])); }
     sug.innerHTML = res.map((r, i) => `<button type="button" data-i="${i}">${esc(r.name || r.display_name.split(",")[0])}<small>${esc(r.display_name)}</small></button>`).join("");
     sug.querySelectorAll("[data-i]").forEach(b => b.addEventListener("click", () => { sug.hidden = true; loadPlace(placeFromNominatim(res[+b.dataset.i])); }));
@@ -776,7 +777,11 @@ function useGPS() {
   const btn = $("#gpsBtn"); btn.disabled = true; btn.lastChild.textContent = " " + tr("Locating…");
   navigator.geolocation.getCurrentPosition(async pos => {
     btn.disabled = false; btn.lastChild.textContent = " " + tr("Where am I?");
-    try { const p = await reverse(pos.coords.latitude, pos.coords.longitude); loadPlace(p); }
+    try {
+      const p = await reverse(pos.coords.latitude, pos.coords.longitude);
+      if (p.country && p.country !== "za") { alertBand(tr("Placelore covers South Africa only. You can still search for a South African town.")); return; }
+      loadPlace(p);
+    }
     catch (err) { loadPlace({ name: tr("Your location"), region: "", lat: pos.coords.latitude, lon: pos.coords.longitude, kind: "location", gps: true }); }
   }, err => {
     btn.disabled = false; btn.lastChild.textContent = " " + tr("Where am I?");
@@ -851,7 +856,7 @@ function loadPlace(p) {
   RETRY.wiki = () => loadWiki(live); RETRY.osm = () => loadOSM(live);
   for (const part of ["stay", "fun", "help"]) RETRY["extra_" + part] = () => loadExtra(live, part);
   RETRY.nature = () => loadNature(live); RETRY.climate = () => loadClimate(live); RETRY.geo = () => loadGeology(live);
-  RETRY.nearby = () => loadNearby(live); RETRY.people = () => loadPeople(live); RETRY.help = () => loadHelp(live);
+  RETRY.nearby = () => loadNearby(live); RETRY.people = () => loadPeople(live); RETRY.peopleWide = () => loadPeople(live, true); RETRY.help = () => loadHelp(live);
   RUN = {
     wiki: once(RETRY.wiki), osm: once(RETRY.osm), nature: once(RETRY.nature),
     stay: once(RETRY.extra_stay), fun: once(RETRY.extra_fun), helpPlaces: once(RETRY.extra_help),
@@ -902,6 +907,7 @@ function openSection(id, { scroll = true } = {}) {
   if (scroll) sec.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 document.addEventListener("click", e => {
+  if (e.target.closest("[data-people-wide]")) return RETRY.peopleWide?.();
   const b = e.target.closest(".read-more"); if (b) { const sec = document.getElementById(b.dataset.open); sec.classList.contains("open") ? (setOpen(sec, false), sec.scrollIntoView({ block: "start" })) : openSection(b.dataset.open); return; }
   const h = e.target.closest("main > section > h2"); if (h) { const sec = h.parentElement; sec.classList.contains("open") ? setOpen(sec, false) : openSection(sec.id); return; }
   const chip = e.target.closest("nav.chapters a[href^='#s-']"); if (chip) { e.preventDefault(); openSection(chip.getAttribute("href").slice(1)); }
@@ -1923,7 +1929,9 @@ async function loadHelp(live) {
 RETRY.help = () => loadHelp(() => true);
 
 /* ---------- famous people (Wikidata) ---------- */
-async function loadPeople(live) {
+// Quick by default: people tied to the town's own Wikidata record. The wider area search is slow
+// (Wikidata often needs 30-60 s for it), so it runs only when asked for.
+async function loadPeople(live, wide = false) {
   const r = Math.min(S.radius / 1000, 8);
   const query = placeClause => `SELECT ?p ?pLabel ?pDescription ?birth ?death ?rel ?en ?af ?links WHERE {
   ${placeClause}
@@ -1942,15 +1950,17 @@ async function loadPeople(live) {
     }
     return getJSON(`https://query.wikidata.org/sparql?${qs({ format: "json", query: q })}`, { headers: { Accept: "application/sparql-results+json" } }, ms);
   };
+  const wideBtn = wide ? "" : `<p style="margin-top:10px"><button type="button" class="btn" data-people-wide>${tr("Also search within {n} km (can take a minute)", { n: r })}</button></p>`;
   try {
-    let d, scope = tr("within {n} km", { n: r });
-    try {
-      d = await sparql(query(`SERVICE wikibase:around { ?place wdt:P625 ?loc . bd:serviceParam wikibase:center "Point(${S.lon} ${S.lat})"^^geo:wktLiteral . bd:serviceParam wikibase:radius "${r}" . }`), 30000);
-    } catch (err) {
-      // The area search is slow when Wikidata is busy; the town on its own is quick
+    let d, scope;
+    if (wide) {
+      $("#people").innerHTML = loading(tr("Searching within {n} km… Wikidata can take up to a minute for this.", { n: r }));
+      d = await sparql(query(`SERVICE wikibase:around { ?place wdt:P625 ?loc . bd:serviceParam wikibase:center "Point(${S.lon} ${S.lat})"^^geo:wktLiteral . bd:serviceParam wikibase:radius "${r}" . }`), 70000);
+      scope = tr("within {n} km", { n: r });
+    } else {
       const qid = await S.qid; if (!live()) return;
-      if (!qid) throw err;
-      d = await sparql(query(`VALUES ?place { wd:${qid} }`), 30000); scope = tr("in {place} itself", { place: S.name });
+      if (!qid) { $("#people").innerHTML = wideBtn; return; }
+      d = await sparql(query(`VALUES ?place { wd:${qid} }`), 20000); scope = tr("in {place} itself", { place: S.name });
     }
     if (!live()) return;
     const people = new Map();
@@ -1959,12 +1969,12 @@ async function loadPeople(live) {
       cur.rels.add(b.rel.value); people.set(id, cur);
     }
     const list = [...people.values()].filter(p => p.name && !/^Q\d+$/.test(p.name)).sort((a, b) => b.links - a.links);
-    if (!list.length) { $("#people").innerHTML = `<p class="empty">${tr("No notable people are recorded as born, died or buried {scope}.", { scope })}</p>`; return; }
+    if (!list.length) { $("#people").innerHTML = `<p class="empty">${tr("No notable people are recorded as born, died or buried {scope}.", { scope })}</p>${wideBtn}`; return; }
     const yr = v => v ? (v.startsWith("-") ? v.slice(1, 5).replace(/^0+/, "") + " BC" : v.slice(0, 4)) : "";
     const row = p => `<li><span class="ic" style="background:var(--hist)">${svg("book")}</span><div class="body"><div class="name"><a href="${esc(p.url)}" target="_blank" rel="noopener">${esc(p.name)}</a>${p.afOnly ? ` <span class="lang-tag">${tr("Afrikaans")}</span>` : ""} <span class="num">${esc([yr(p.birth), yr(p.death)].filter(Boolean).join("–"))}</span></div>${p.desc ? `<div class="sub">${esc(p.desc)}</div>` : ""}<div class="sub ui">${esc([...p.rels].map(x => tr({ born: "Born here", died: "Died here", buried: "Buried here" }[x])).join(" · "))}</div></div></li>`;
     $("#people").innerHTML = `<ul class="items" style="max-width:720px">${list.slice(0, 15).map(row).join("")}</ul>` +
-      (list.length > 15 ? `<details class="more showall"><summary>${tr("Show all {n}", { n: list.length })}</summary><ul class="items" style="max-width:720px">${list.slice(15).map(row).join("")}</ul></details>` : "");
-  } catch (err) { if (live()) $("#people").innerHTML = errHTML(tr("Notable people did not load ({err}).", { err: err.message }), "people"); }
+      (list.length > 15 ? `<details class="more showall"><summary>${tr("Show all {n}", { n: list.length })}</summary><ul class="items" style="max-width:720px">${list.slice(15).map(row).join("")}</ul></details>` : "") + wideBtn;
+  } catch (err) { if (live()) $("#people").innerHTML = errHTML(tr("Notable people did not load ({err}).", { err: err.message }), wide ? "peopleWide" : "people") + wideBtn; }
 }
 
 /* ---------- nearby Wikipedia articles ---------- */

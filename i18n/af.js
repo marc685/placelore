@@ -613,5 +613,9 @@ window.I18N.af = {
  "Today: {min}–{max}°C, {rain}% chance of rain. Sunset {sunset}.": "Vandag: {min}–{max}°C, {rain}% kans op reën. Sonsondergang {sunset}.",
  "{m} m above sea level. Rivers, rocks and peaks around you.": "{m} m bo seevlak. Riviere, rotse en pieke rondom jou.",
  "The map servers are slow right now. Still looking…": "Die kaartbedieners is nou stadig. Soek steeds…",
- "Finding the nearest help…": "Soek die naaste hulp…"
+ "Finding the nearest help…": "Soek die naaste hulp…",
+ "Also search within {n} km (can take a minute)": "Soek ook binne {n} km (kan 'n minuut duur)",
+ "Searching within {n} km… Wikidata can take up to a minute for this.": "Soek binne {n} km… Wikidata kan tot 'n minuut hiervoor neem.",
+ "Placelore covers South Africa only. You can still search for a South African town.": "Placelore dek net Suid-Afrika. Jy kan steeds na 'n Suid-Afrikaanse dorp soek.",
+ "No place in South Africa called “{q}”. Check the spelling.": "Geen plek in Suid-Afrika genaamd “{q}” nie. Kontroleer die spelling."
 };
