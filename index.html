@@ -1219,6 +1219,15 @@ function renderName(secs, full, f) {
 
 /* ---------- OpenStreetMap via Overpass ---------- */
 const OVERPASS = ["https://overpass-api.de/api/interpreter", "https://overpass.kumi.systems/api/interpreter", "https://overpass.private.coffee/api/interpreter"];
+// Placelore's own map data answers in milliseconds; the public map servers are only the fallback
+// (data not built yet, or the server can't be reached)
+async function placesOr(kind, q, radius = S.radius) {
+  if (location.protocol.startsWith("http")) {
+    try { return await getJSON(`/api/places?${qs({ kind, lat: S.lat.toFixed(5), lon: S.lon.toFixed(5), r: Math.round(radius) })}`, {}, 15000); }
+    catch (e) { if (!navigator.onLine) throw e; }
+  }
+  return overpass(q);
+}
 // Each query starts on a different mirror and falls over to the others; at most two run at once
 let overpassCalls = 0, overpassActive = 0; const overpassWaiting = [];
 async function overpass(q) {
@@ -1286,9 +1295,15 @@ way["landuse"~"^(greenhouse_horticulture|plant_nursery)$"]${a};out count;
 way["landuse"="forest"]${a};out count;`;
 
   stillLooking("#trails", live); stillLooking("#camping", live);
-  const linesP = overpass(qLines).then(d => { if (live()) renderLines(d.elements || []); })
+  const linesP = placesOr("lines", qLines).then(d => {
+    if (!live()) return;
+    renderLines(d.elements || []);
+    // Marked hiking routes aren't in our own data, so they're added from the public servers when they arrive
+    if (d.source === "placelore") overpass(`[out:json][timeout:30];relation["route"~"^(hiking|foot|walking)$"](${bbox(S.lat, S.lon, S.radius)});out tags geom(${bb}) qt;`)
+      .then(rd => { if (live() && rd.elements?.length) { layers.trails.clearLayers(); renderLines([...rd.elements, ...(d.elements || [])], { trailsOnly: true }); } }).catch(() => {});
+  })
     .catch(err => { if (!live()) return; $("#trails").innerHTML = errHTML(tr("Trail data did not load ({err}). The map servers may be busy.", { err: err.message }), "osm"); $("#rivers").innerHTML = errHTML(tr("River data did not load."), "osm"); });
-  const poiP = overpass(qPoi).then(d => { if (live()) renderPOIs(d.elements || []); })
+  const poiP = placesOr("points", qPoi).then(d => { if (live()) renderPOIs(d.elements || []); })
     .catch(err => { if (!live()) return; for (const s of ["#camping", "#picnic", "#views", "#farms", "#peaks", "#hist-sites"]) $(s).innerHTML = errHTML(tr("Map data did not load ({err}).", { err: err.message }), "osm"); });
   await Promise.all([linesP, poiP]);
 }
@@ -1301,7 +1316,7 @@ async function loadUnnamedPaths() {
   const q = `[out:json][timeout:45];way["highway"~"^(path|bridleway)$"][!"name"](${bbox(S.lat, S.lon, Rt)});out tags geom(${bbox(S.lat, S.lon, S.radius * 1.05)}) qt;`;
   const st = $("#pathsStatus"); if (st) st.textContent = tr("Loading footpaths…");
   try {
-    const d = await overpass(q); if (my !== token) return;
+    const d = await placesOr("paths", q, Rt); if (my !== token) return;
     const col = css("--trail"); let total = 0;
     for (const el of d.elements || []) {
       const t = el.tags || {}, segs = segments(el.geometry); if (!segs.length) continue;
@@ -1325,7 +1340,7 @@ function itemsList(items, key, max = 12) {
 const dirLink = c => [tr("Directions"), `https://www.google.com/maps/dir/?api=1&destination=${c.lat},${c.lon}`];
 const osmLink = el => ["OSM", `https://www.openstreetmap.org/${el.type}/${el.id}`];
 
-function renderLines(els) {
+function renderLines(els, { trailsOnly = false } = {}) {
   const trailCol = css("--trail"), riverCol = css("--river");
   // trails
   const routes = [], paths = new Map();
@@ -1362,6 +1377,7 @@ function renderLines(els) {
   $("#trails").innerHTML = (itemsList(all, "trails", 15) || `<p class="empty">${tr("No named trails mapped within {n} km.", { n: S.radius / 1000 })}</p>`) +
     `<p class="sub" style="color:var(--muted);font-size:.9rem;margin-top:8px" id="pathsStatus">${$("#lt-paths")?.checked ? "" : tr("Switch on “Unnamed footpaths” on the map to see smaller paths too.")}</p>`;
 
+  if (trailsOnly) return;
   // rivers
   const rivers = new Map();
   for (const el of els) {
@@ -1833,7 +1849,7 @@ async function loadExtra(live, part) {
 out tags center qt;`;
   stillLooking(PART_BOX[part], live);
   try {
-    const d = await overpass(q); if (!live()) return;
+    const d = await placesOr(part, q); if (!live()) return;
     const stay = {}, fun = {}, help = {};
     for (const el of d.elements || []) {
       const t = el.tags || {}, c = center(el); if (!c) continue;

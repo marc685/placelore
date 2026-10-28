@@ -6,6 +6,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import zlib from "node:zlib";
+import { open } from "node:fs/promises";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 8080;
@@ -240,6 +241,64 @@ Keep names of people, places, rivers, mountains, farms, buildings and organisati
   send(200, { translations: out });
 }
 
+
+/* ---------- Placelore's own map data for South Africa ---------- */
+// Built from the OpenStreetMap extract when the image is built (tools/build-places.mjs): one file per
+// kind of place, cut into 0.1° cells. A query reads only the cells around the point, so answers come
+// back in milliseconds instead of waiting on the public map servers.
+const PLACES_DIR = path.join(here, "places");
+const PLACE_KINDS = ["stay", "fun", "help", "points", "lines", "paths", "landuse"];
+let placesMeta = null; const placeFiles = {};
+async function openPlaces() {
+  try {
+    placesMeta = JSON.parse(await readFile(path.join(PLACES_DIR, "meta.json"), "utf8"));
+    for (const k of PLACE_KINDS) placeFiles[k] = { index: JSON.parse(await readFile(path.join(PLACES_DIR, `${k}.idx.json`), "utf8")), fh: await open(path.join(PLACES_DIR, `${k}.bin`), "r") };
+    console.log(`Place data from ${placesMeta.built}: ${placesMeta.features} features`);
+  } catch { placesMeta = null; console.log("No place data: the app will use the public map servers"); }
+}
+const cellCache = new Map(), CELL_CACHE_MAX = 150;  // decoded cells, most recently used last (city cells can be a few MB)
+async function readCell(kind, key) {
+  const ck = kind + key; let recs = cellCache.get(ck);
+  if (recs) { cellCache.delete(ck); cellCache.set(ck, recs); return recs; }
+  const at = placeFiles[kind].index[key]; if (!at) return [];
+  const buf = Buffer.alloc(at[1]); await placeFiles[kind].fh.read(buf, 0, at[1], at[0]);
+  recs = JSON.parse(zlib.gunzipSync(buf).toString("utf8"));
+  cellCache.set(ck, recs); if (cellCache.size > CELL_CACHE_MAX) cellCache.delete(cellCache.keys().next().value);
+  return recs;
+}
+const LANDUSE_ORDER = 6; // vineyard, orchard, farmland, meadow, greenhouses & nurseries, forest
+async function places(req, res) {
+  const u = new URL(req.url, "http://x"), kind = u.searchParams.get("kind");
+  const lat = +u.searchParams.get("lat"), lon = +u.searchParams.get("lon"), r = Math.min(+u.searchParams.get("r") || 10000, 30000);
+  const send = (code, obj) => sendCompressed(req, res, code, { "Content-Type": "application/json", "Cache-Control": code === 200 ? "public, max-age=3600" : "no-store" }, Buffer.from(JSON.stringify(obj)));
+  if (!placesMeta) return send(404, { error: "no place data" });
+  if (!PLACE_KINDS.includes(kind) || kind === "landuse" || !isFinite(lat) || !isFinite(lon)) return send(400, { error: "bad request" });
+  const [minLon, minLat, maxLon, maxLat] = placesMeta.bounds;
+  if (lat < minLat || lat > maxLat || lon < minLon || lon > maxLon) return send(404, { error: "outside the area covered" });
+  const dLat = r / 111320, dLon = r / (111320 * Math.cos(lat * Math.PI / 180)), C = placesMeta.cell;
+  const s = lat - dLat, n = lat + dLat, w = lon - dLon, e = lon + dLon, keys = [];
+  for (let y = Math.floor(s * C); y <= Math.floor(n * C); y++) for (let x = Math.floor(w * C); x <= Math.floor(e * C); x++) keys.push(`${y}_${x}`);
+  const inBox = (a, o) => a >= s && a <= n && o >= w && o <= e;
+  const elements = [];
+  const type = t => t === "n" ? "node" : t === "r" ? "relation" : "way";
+  for (const key of keys) for (const rec of await readCell(kind, key)) {
+    if (rec.c) {
+      // Trim the piece to the area, keeping one point either side so the line reaches the edge
+      let first = -1, last = -1;
+      rec.c.forEach(([a, o], i) => { if (inBox(a, o)) { if (first < 0) first = i; last = i; } });
+      if (first >= 0) elements.push({ type: "way", id: rec.i, tags: rec.g, geometry: rec.c.slice(Math.max(0, first - 1), last + 2).map(([a, o]) => ({ lat: a, lon: o })) });
+    }
+    else if (inBox(rec.a, rec.o)) elements.push(rec.t === "n" ? { type: "node", id: rec.i, lat: rec.a, lon: rec.o, tags: rec.g } : { type: type(rec.t), id: rec.i, center: { lat: rec.a, lon: rec.o }, tags: rec.g });
+  }
+  if (kind === "points") {
+    // Land use is counted, the way the app's map-server query did it
+    const counts = new Array(LANDUSE_ORDER).fill(0);
+    for (const key of keys) for (const [a, o, code] of await readCell("landuse", key)) if (inBox(a, o)) counts[code]++;
+    for (const total of counts) elements.push({ type: "count", tags: { total: String(total) } });
+  }
+  send(200, { elements, source: "placelore", built: placesMeta.built });
+}
+
 /* ---------- Overpass and Wikidata relay ---------- */
 const OVERPASS = ["https://overpass-api.de/api/interpreter", "https://overpass.kumi.systems/api/interpreter", "https://overpass.private.coffee/api/interpreter"];
 const UA = "Placelore/1.0 (https://github.com/marc685/placelore)";
@@ -354,8 +413,10 @@ http.createServer((req, res) => {
     if (req.method !== "POST") { res.writeHead(405); return res.end(); }
     return translate(req, res).catch(err => { console.error(err); if (!res.headersSent) res.writeHead(500); res.end(); });
   }
+  if (req.url.startsWith("/api/places")) return places(req, res).catch(err => { console.error(err); if (!res.headersSent) res.writeHead(500); res.end(); });
   if (req.url.startsWith("/api/overpass")) return relay(req, res, "overpass").catch(err => { console.error(err); if (!res.headersSent) res.writeHead(500); res.end(); });
   if (req.url.startsWith("/api/sparql")) return relay(req, res, "sparql").catch(err => { console.error(err); if (!res.headersSent) res.writeHead(500); res.end(); });
   if (req.url === "/healthz") { res.writeHead(200); return res.end("ok"); }
   return serveStatic(req, res);
 }).listen(PORT, () => console.log(`Placelore listening on ${PORT}`));
+openPlaces();
